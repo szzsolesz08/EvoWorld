@@ -38,6 +38,24 @@ final class UntestedGuess {
         return Math.max(knowledge.confidence(kind, type), CONFIDENCE);
     }
 
+    /** How much of an untried thing an agent expects to take: a taste. */
+    static final double TASTE = 1.0;
+
+    /**
+     * How many units an agent means to have of something, as far as it can
+     * tell: as much as the need could take once it knows the thing is food or
+     * drink, but only a taste of something it has never tried.
+     *
+     * <p>Without the difference, every untried thing - a rock, a log, a spring
+     * - looked like a whole meal to a newborn, all of them equally good, and it
+     * walked back and forth between them instead of tasting any.
+     */
+    static double unitsExpected(Knowledge knowledge, BeliefKind kind, ResourceType type, double available) {
+        return knowledge.believe(kind, type).isAssumed()
+                ? Math.min(TASTE, available)
+                : available;
+    }
+
     private UntestedGuess() {
     }
 }

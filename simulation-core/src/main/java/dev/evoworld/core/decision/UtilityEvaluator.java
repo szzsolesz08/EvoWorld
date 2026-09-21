@@ -100,20 +100,20 @@ public final class UtilityEvaluator implements ActionEvaluator {
     private double risk(ActionCandidate candidate, Needs needs) {
         int ticks = candidate.ticksToBenefit();
         Needs projected = new Needs(
-                needs.hunger() + metabolism.hungerPerTick() * ticks,
-                needs.thirst() + metabolism.thirstPerTick() * ticks,
+                needs.hunger() + metabolism.hunger() * ticks,
+                needs.thirst() + metabolism.thirst() * ticks,
                 needs.energy() - candidate.expectedEnergyCost(),
                 needs.health());
 
         double damagePerTick = 0.0;
         if (projected.isStarving()) {
-            damagePerTick += metabolism.starvationDamage();
+            damagePerTick += metabolism.starvation();
         }
         if (projected.isDehydrated()) {
-            damagePerTick += metabolism.dehydrationDamage();
+            damagePerTick += metabolism.dehydration();
         }
         if (projected.isExhausted()) {
-            damagePerTick += metabolism.exhaustionDamage();
+            damagePerTick += metabolism.exhaustion();
         }
         if (damagePerTick <= 0.0 || needs.health() <= Needs.MIN) {
             return damagePerTick > 0.0 ? 1.0 : 0.0;

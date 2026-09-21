@@ -8,30 +8,17 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Stay put and recover.
+ * Stay put for a breather.
  *
- * <p>The only action that declares itself {@link ActivityLevel#RESTING}, which
- * is what makes it a net gain rather than a smaller loss. It restores energy
- * directly; health it leaves to the body, which heals faster through a tick
- * spent at rest - so resting is worth doing for a wounded agent that is not
- * tired at all.
+ * <p>Declares itself {@link ActivityLevel#RESTING}, and that is all it does: the
+ * body recovers a little energy through the metabolism while it sits, and mends
+ * faster than it would on the move. Real recovery is a night's sleep
+ * ({@link SleepAction}); a rest is what an agent takes when it is not sleepy
+ * but has nothing better to do, or is hurt.
  */
 public final class RestAction extends Action {
 
     public static final String NAME = "REST";
-
-    private final double energyGain;
-
-    public RestAction(double energyGain) {
-        if (energyGain < 0.0) {
-            throw new IllegalArgumentException("rest cannot cost energy, was " + energyGain);
-        }
-        this.energyGain = energyGain;
-    }
-
-    public double energyGain() {
-        return energyGain;
-    }
 
     @Override
     public String name() {
@@ -54,21 +41,16 @@ public final class RestAction extends Action {
 
     @Override
     protected String effect(Agent agent, World world) {
-        double before = agent.needs().energy();
-        agent.rest(energyGain);
-        double recovered = agent.needs().energy() - before;
-        return String.format(
-                Locale.ROOT, "rested at %s, recovered %.1f energy", agent.location(), recovered);
+        return String.format(Locale.ROOT, "rested at %s", agent.location());
     }
 
     @Override
     public boolean equals(Object other) {
-        return other instanceof RestAction rest
-                && Double.compare(energyGain, rest.energyGain) == 0;
+        return other instanceof RestAction;
     }
 
     @Override
     public int hashCode() {
-        return Double.hashCode(energyGain);
+        return RestAction.class.hashCode();
     }
 }

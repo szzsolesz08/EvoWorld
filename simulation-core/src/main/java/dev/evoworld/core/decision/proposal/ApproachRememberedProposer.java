@@ -33,14 +33,19 @@ import java.util.Locale;
 public final class ApproachRememberedProposer implements ActionProposer {
 
     private final double moveEnergyCost;
-    private final double eatPortion;
-    private final double drinkGulp;
 
-    public ApproachRememberedProposer(
-            double moveEnergyCost, double eatPortion, double drinkGulp) {
+    private final int stepsPerTick;
+    private final int gatherTicks;
+
+    public ApproachRememberedProposer(double moveEnergyCost) {
+        this(moveEnergyCost, 1, 2);
+    }
+
+    /** @param gatherTicks how long picking food takes once there, before any of it is eaten */
+    public ApproachRememberedProposer(double moveEnergyCost, int stepsPerTick, int gatherTicks) {
         this.moveEnergyCost = moveEnergyCost;
-        this.eatPortion = eatPortion;
-        this.drinkGulp = drinkGulp;
+        this.stepsPerTick = stepsPerTick;
+        this.gatherTicks = gatherTicks;
     }
 
     @Override
@@ -53,23 +58,29 @@ public final class ApproachRememberedProposer implements ActionProposer {
                 continue;
             }
             Knowledge knowledge = perception.knowledge();
-            if (needs.thirst() > Needs.MIN
+            if (needs.thirst() >= Needs.NOTICEABLE
                     && ExpectedRelief.thinksItIsADrink(knowledge, place.type())) {
                 candidates.add(head(
                         place,
                         SatisfyThirstGoal.NAME,
-                        ExpectedRelief.fromDrinking(knowledge, needs, place.type(), drinkGulp),
+                        ExpectedRelief.fromDrinking(knowledge, needs, place.type(),
+                                UntestedGuess.unitsExpected(
+                                        knowledge, BeliefKind.HYDRATION, place.type(), ExpectedRelief.FILL_UP)),
                         UntestedGuess.worthIt(knowledge, BeliefKind.HYDRATION, place.type()),
-                        knowledge));
+                        knowledge,
+                        0));
             }
-            if (needs.hunger() > Needs.MIN
+            if (needs.hunger() >= Needs.NOTICEABLE
                     && ExpectedRelief.thinksItIsFood(knowledge, place.type())) {
                 candidates.add(head(
                         place,
                         SatisfyHungerGoal.NAME,
-                        ExpectedRelief.fromEating(knowledge, needs, place.type(), eatPortion),
+                        ExpectedRelief.fromEating(knowledge, needs, place.type(),
+                                UntestedGuess.unitsExpected(
+                                        knowledge, BeliefKind.NOURISHMENT, place.type(), ExpectedRelief.FILL_UP)),
                         UntestedGuess.worthIt(knowledge, BeliefKind.NOURISHMENT, place.type()),
-                        knowledge));
+                        knowledge,
+                        gatherTicks + 1));
             }
         }
         return List.copyOf(candidates);
@@ -80,7 +91,8 @@ public final class ApproachRememberedProposer implements ActionProposer {
             String goal,
             double benefit,
             double worthIt,
-            Knowledge knowledge) {
+            Knowledge knowledge,
+            int work) {
         int steps = place.stepsAway();
         // Three doubts compound: how well the agent remembers the place, how
         // often places of this kind turn out to still have anything in them,
@@ -89,7 +101,7 @@ public final class ApproachRememberedProposer implements ActionProposer {
                 knowledge.estimate(BeliefKind.LOCATION_RELIABILITY, place.type());
         return ActionCandidate.heading(
                 place.location(),
-                new MoveAction(place.location(), moveEnergyCost),
+                new MoveAction(place.location(), moveEnergyCost, stepsPerTick),
                 goal,
                 benefit,
                 clampToFraction(place.confidence() * reliability * worthIt),
@@ -101,7 +113,8 @@ public final class ApproachRememberedProposer implements ActionProposer {
                         place.type().label(),
                         steps,
                         place.direction().label(),
-                        place.ticksSinceSeen()));
+                        place.ticksSinceSeen()),
+                work);
     }
 
     private static double clampToFraction(double value) {

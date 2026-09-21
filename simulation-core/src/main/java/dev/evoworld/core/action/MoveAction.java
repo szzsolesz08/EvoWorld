@@ -24,14 +24,28 @@ public final class MoveAction extends Action {
 
     private final Location destination;
     private final double energyCostPerStep;
+    private final int stepsPerTick;
 
-    public MoveAction(Location destination, double energyCostPerStep) {
+    /**
+     * @param stepsPerTick how far one tick's walking goes - one tile at the
+     *     default tick length, more when ticks are longer
+     */
+    public MoveAction(Location destination, double energyCostPerStep, int stepsPerTick) {
         this.destination = Objects.requireNonNull(destination, "destination");
         if (energyCostPerStep < 0.0) {
             throw new IllegalArgumentException(
                     "movement cannot give energy back, was " + energyCostPerStep);
         }
+        if (stepsPerTick < 1) {
+            throw new IllegalArgumentException("a move takes at least one step, was " + stepsPerTick);
+        }
         this.energyCostPerStep = energyCostPerStep;
+        this.stepsPerTick = stepsPerTick;
+    }
+
+    /** One step a tick. */
+    public MoveAction(Location destination, double energyCostPerStep) {
+        this(destination, energyCostPerStep, 1);
     }
 
     public Location destination() {
@@ -40,6 +54,11 @@ public final class MoveAction extends Action {
 
     public double energyCostPerStep() {
         return energyCostPerStep;
+    }
+
+    @Override
+    public int stepsPerTick() {
+        return stepsPerTick;
     }
 
     @Override
@@ -74,23 +93,29 @@ public final class MoveAction extends Action {
     @Override
     protected String effect(Agent agent, World world) {
         Location from = agent.location();
-        Location next = from.stepTowards(destination);
-        agent.moveTo(next);
         // A practised walker spends less on the same step.
-        agent.exert(energyCostPerStep * agent.skills().effortMultiplier(NAME));
-        return "moved " + from + " -> " + next + " heading for " + destination;
+        double costPerStep = energyCostPerStep * agent.skills().effortMultiplier(NAME);
+        for (int step = 0; step < stepsPerTick && !agent.location().equals(destination); step++) {
+            if (step > 0 && agent.needs().energy() < costPerStep) {
+                break;
+            }
+            agent.moveTo(agent.location().stepTowards(destination));
+            agent.exert(costPerStep);
+        }
+        return "moved " + from + " -> " + agent.location() + " heading for " + destination;
     }
 
     @Override
     public boolean equals(Object other) {
         return other instanceof MoveAction move
                 && destination.equals(move.destination)
-                && Double.compare(energyCostPerStep, move.energyCostPerStep) == 0;
+                && Double.compare(energyCostPerStep, move.energyCostPerStep) == 0
+                && stepsPerTick == move.stepsPerTick;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(destination, energyCostPerStep);
+        return Objects.hash(destination, energyCostPerStep, stepsPerTick);
     }
 
     @Override

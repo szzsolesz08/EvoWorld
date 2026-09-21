@@ -118,7 +118,7 @@ public final class WorldMapRenderer {
                     held.get(type),
                     total.get(type),
                     type.isRenewable()
-                            ? "regrows " + type.regenPerTick() + "/tick"
+                            ? "regrows " + type.regenPerHour() + "/h"
                             : "does not regrow"));
         }
         for (AgentSnapshot agent : state.agents()) {

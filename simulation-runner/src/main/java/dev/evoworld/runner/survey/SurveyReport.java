@@ -40,6 +40,23 @@ public final class SurveyReport {
         }
 
         lines.add("");
+        lines.add("## A day in the life");
+        lines.add("");
+        lines.add("Averaged over every seed and every simulated day each run lived.");
+        lines.add("");
+        lines.add("| Scenario | Sleep h/day | Sleeps/day | Meals/day | Drinks/day | Free time |");
+        lines.add("| --- | ---: | ---: | ---: | ---: | ---: |");
+        for (ScenarioResult result : results) {
+            lines.add(String.format(Locale.ROOT, "| %s | %.1f | %.2f | %.1f | %.1f | %.0f%% |",
+                    result.scenario().name(),
+                    result.sleepHoursPerDay(),
+                    result.sleepsPerDay(),
+                    result.mealsPerDay(),
+                    result.drinksPerDay(),
+                    result.freeShare() * 100));
+        }
+
+        lines.add("");
         lines.add("## Scenarios");
         lines.add("");
         for (ScenarioResult result : results) {

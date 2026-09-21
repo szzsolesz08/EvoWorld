@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.evoworld.core.world.Location;
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -13,6 +14,9 @@ import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 class ResourceNodeTest {
+
+    /** The default tick; regrowth is per hour, applied a tick at a time. */
+    private static final Duration TICK = Duration.ofMinutes(10);
 
     private static final double EPSILON = 1e-9;
     private static final Location HERE = new Location(3, 4);
@@ -194,23 +198,23 @@ class ResourceNodeTest {
         void renewableNodesRegrow() {
             ResourceNode node = ResourceNode.holding(ResourceType.BERRIES, HERE, 0.0);
 
-            node.regenerate();
+            node.regenerate(TICK);
 
-            assertEquals(ResourceType.BERRIES.regenPerTick(), node.quantity(), EPSILON);
+            assertEquals(ResourceType.BERRIES.regenPerTick(TICK), node.quantity(), EPSILON);
         }
 
         @Test
         @DisplayName("a picked bush grows back to full and stops there")
         void regrowthStopsAtCapacity() {
             ResourceNode node = ResourceNode.holding(ResourceType.BERRIES, HERE, 0.0);
-            long expected = ResourceType.BERRIES.ticksToFullFromEmpty().orElseThrow();
+            long expected = ResourceType.BERRIES.ticksToFullFromEmpty(TICK).orElseThrow();
 
             for (long tick = 0; tick < expected; tick++) {
-                node.regenerate();
+                node.regenerate(TICK);
             }
             assertTrue(node.isFull(), "should be full after " + expected + " ticks");
 
-            node.regenerate();
+            node.regenerate(TICK);
             assertEquals(node.capacity(), node.quantity(), EPSILON, "must not overflow capacity");
         }
 
@@ -221,7 +225,7 @@ class ResourceNodeTest {
             node.harvestAll();
 
             for (int tick = 0; tick < 1000; tick++) {
-                node.regenerate();
+                node.regenerate(TICK);
             }
 
             assertTrue(node.isDepleted());
@@ -233,11 +237,11 @@ class ResourceNodeTest {
         void regrowthRespectsNodeCapacity() {
             ResourceNode small = new ResourceNode(ResourceType.BERRIES, HERE, 1.0, 0.0);
 
-            small.regenerate();
-            small.regenerate();
-            small.regenerate();
-            small.regenerate();
-            small.regenerate();
+            small.regenerate(TICK);
+            small.regenerate(TICK);
+            small.regenerate(TICK);
+            small.regenerate(TICK);
+            small.regenerate(TICK);
 
             assertEquals(1.0, small.quantity(), EPSILON);
         }
@@ -246,12 +250,12 @@ class ResourceNodeTest {
         @DisplayName("harvest and regrowth interleave the way a foraged bush would")
         void harvestAndRegrowthInterleave() {
             ResourceNode node = ResourceNode.full(ResourceType.BERRIES, HERE);
-            double rate = ResourceType.BERRIES.regenPerTick();
+            double rate = ResourceType.BERRIES.regenPerTick(TICK);
 
             node.harvest(6.0);
             double afterHarvest = node.quantity();
-            node.regenerate();
-            node.regenerate();
+            node.regenerate(TICK);
+            node.regenerate(TICK);
 
             assertEquals(afterHarvest + 2 * rate, node.quantity(), EPSILON);
             assertFalse(node.isFull());
@@ -262,7 +266,7 @@ class ResourceNodeTest {
         void regeneratingAFullNodeIsANoOp() {
             ResourceNode node = ResourceNode.full(ResourceType.WATER, HERE);
 
-            node.regenerate();
+            node.regenerate(TICK);
 
             assertEquals(ResourceType.WATER.capacity(), node.quantity(), EPSILON);
         }

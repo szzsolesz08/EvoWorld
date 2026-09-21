@@ -6,6 +6,7 @@ import dev.evoworld.core.agent.AgentId;
 import dev.evoworld.core.resource.ResourceNode;
 import dev.evoworld.core.resource.ResourceSnapshot;
 import dev.evoworld.core.resource.ResourceType;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -82,8 +83,9 @@ public final class World {
     }
 
     /** Applies one tick of regrowth to every node. */
-    public void regenerateResources() {
-        resources.values().forEach(ResourceNode::regenerate);
+    /** One tick of regrowth everywhere, for a tick of {@code tick}. */
+    public void regenerateResources(Duration tick) {
+        resources.values().forEach(node -> node.regenerate(tick));
     }
 
     // --- agents -----------------------------------------------------------

@@ -32,7 +32,7 @@ public final class DrinkProposer implements ActionProposer {
     public List<ActionCandidate> propose(Perception perception, SimulationRandom random) {
         Optional<PerceivedResource> here =
                 perception.underfoot().filter(PerceivedResource::isAvailable);
-        if (here.isEmpty() || perception.needs().thirst() <= Needs.MIN) {
+        if (here.isEmpty() || perception.needs().thirst() < Needs.NOTICEABLE) {
             return List.of();
         }
 
@@ -41,12 +41,17 @@ public final class DrinkProposer implements ActionProposer {
             return List.of();
         }
 
-        double available = Math.min(gulp, source.quantity());
+        // Valued at what the spring can do for this thirst, not at one gulp:
+        // the same measure as walking to water somewhere else, so standing in a
+        // spring never looks worse than a trip to one. The gulp is what one
+        // tick drinks; the next tick weighs whatever thirst is left.
         return List.of(new ActionCandidate(
                 new DrinkAction(source.type(), gulp),
                 SatisfyThirstGoal.NAME,
                 ExpectedRelief.fromDrinking(
-                        perception.knowledge(), perception.needs(), source.type(), available),
+                        perception.knowledge(), perception.needs(), source.type(),
+                        UntestedGuess.unitsExpected(
+                                perception.knowledge(), BeliefKind.HYDRATION, source.type(), source.quantity())),
                 // Sure the spring is here; only as sure as experience allows
                 // that drinking from it will help.
                 believedConfidence(perception, source),

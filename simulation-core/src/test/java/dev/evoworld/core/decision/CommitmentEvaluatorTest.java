@@ -79,7 +79,7 @@ class CommitmentEvaluatorTest {
         assertEquals(0.5, score(walkTo(OTHER_SPRING, THIRST), agent).utility());
         assertEquals(0.5, score(walkTo(SPRING, SatisfyHungerGoal.NAME), agent).utility());
         assertEquals(0.5, score(
-                ActionCandidate.here(new RestAction(1.0), THIRST, 0.5, 0.0, "rest"),
+                ActionCandidate.here(new RestAction(), THIRST, 0.5, 0.0, "rest"),
                 agent).utility());
     }
 

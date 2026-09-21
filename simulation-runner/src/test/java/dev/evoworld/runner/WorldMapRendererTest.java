@@ -132,7 +132,7 @@ class WorldMapRendererTest {
         String output = rendered(state);
 
         assertTrue(output.contains("berries  2 node(s)    18.0 /   24.0"), output);
-        assertTrue(output.contains("regrows 0.25/tick"), output);
+        assertTrue(output.contains("regrows 1.5/h"), output);
         assertTrue(output.contains("does not regrow"), output);
     }
 

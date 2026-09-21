@@ -7,8 +7,10 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.evoworld.core.action.ActionOutcome;
+import dev.evoworld.core.agent.ActivityLevel;
 import dev.evoworld.core.agent.Agent;
 import dev.evoworld.core.agent.AgentId;
+import dev.evoworld.core.agent.MetabolismRates;
 import dev.evoworld.core.agent.Needs;
 import dev.evoworld.core.decision.Decision;
 import dev.evoworld.core.decision.DeliberativeDecisionMaker;
@@ -79,13 +81,35 @@ class SimulationTest {
     }
 
     @Test
-    @DisplayName("tick duration changes the meaning of a tick, not the outcome of the run")
-    void tickDurationDoesNotAlterBehaviour() {
-        WorldState fastTicks = runAndSnapshot(CONFIG.withTickDuration(Duration.ofSeconds(1)));
+    @DisplayName("rates are per simulated hour: an hour does the same to a body at any tick length")
+    void anHourIsAnHour() {
+        MetabolismRates perHour = CONFIG.metabolism();
+        Needs start = new Needs(10.0, 10.0, 80.0, 90.0);
+
+        Needs inTenMinuteTicks = start;
+        for (int i = 0; i < 6; i++) {
+            inTenMinuteTicks = inTenMinuteTicks.afterTick(
+                    perHour.perTick(Duration.ofMinutes(10)), ActivityLevel.ACTIVE);
+        }
+        Needs inOneTick = start.afterTick(perHour.perTick(Duration.ofHours(1)), ActivityLevel.ACTIVE);
+
+        assertEquals(inOneTick.hunger(), inTenMinuteTicks.hunger(), 1e-9);
+        assertEquals(inOneTick.thirst(), inTenMinuteTicks.thirst(), 1e-9);
+        assertEquals(inOneTick.energy(), inTenMinuteTicks.energy(), 1e-9);
+        assertEquals(inOneTick.health(), inTenMinuteTicks.health(), 1e-9);
+        assertEquals(start.thirst() + perHour.thirst(), inOneTick.thirst(), 1e-9);
+    }
+
+    @Test
+    @DisplayName("tick duration changes how finely time is cut, not how fast it passes")
+    void tickDurationKeepsTheClock() {
+        WorldState fastTicks = runAndSnapshot(CONFIG.withTickDuration(Duration.ofMinutes(1)));
         WorldState slowTicks = runAndSnapshot(CONFIG.withTickDuration(Duration.ofHours(1)));
 
-        assertEquals(fastTicks.agents(), slowTicks.agents());
         assertNotEquals(fastTicks.time(), slowTicks.time());
+        assertTrue(fastTicks.agents().get(0).needs().thirst()
+                < slowTicks.agents().get(0).needs().thirst(),
+                "the same number of shorter ticks is less time, so less thirst");
     }
 
     @Test
@@ -103,8 +127,9 @@ class SimulationTest {
         simulation.run(5);
 
         AgentSnapshot agent = simulation.snapshot().agents().get(0);
-        assertEquals(5 * CONFIG.metabolism().hungerPerTick(), agent.needs().hunger(), 1e-9);
-        assertEquals(5 * CONFIG.metabolism().thirstPerTick(), agent.needs().thirst(), 1e-9);
+        MetabolismRates perTick = CONFIG.metabolism().perTick(CONFIG.tickDuration());
+        assertEquals(5 * perTick.hunger(), agent.needs().hunger(), 1e-9);
+        assertEquals(5 * perTick.thirst(), agent.needs().thirst(), 1e-9);
     }
 
     @Test
@@ -150,7 +175,7 @@ class SimulationTest {
 
         simulation.run(8);
 
-        assertEquals(8 * ResourceType.BERRIES.regenPerTick(), bush.quantity(), 1e-9);
+        assertEquals(8 * ResourceType.BERRIES.regenPerTick(CONFIG.tickDuration()), bush.quantity(), 1e-9);
         assertEquals(0.0, outcrop.quantity(), 1e-9, "stone does not regrow");
     }
 

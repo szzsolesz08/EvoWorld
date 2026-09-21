@@ -15,9 +15,11 @@ import java.util.Objects;
  * @param y where it is headed, for a move
  * @param amount the quantity it deals in: a portion, a gulp, a haul, a rest
  * @param cost the energy it costs, where it has one
+ * @param ticks how long it was chosen to last, for actions whose length is
+ *     decided when they start, such as a sleep; zero otherwise
  */
 public record SavedAction(
-        String kind, ResourceType resource, Integer x, Integer y, double amount, double cost) {
+        String kind, ResourceType resource, Integer x, Integer y, double amount, double cost, int ticks) {
 
     public SavedAction {
         Objects.requireNonNull(kind, "kind");

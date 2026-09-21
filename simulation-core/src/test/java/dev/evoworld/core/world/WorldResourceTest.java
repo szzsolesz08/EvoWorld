@@ -104,10 +104,10 @@ class WorldResourceTest {
         world.addResource(spring);
         world.addResource(outcrop);
 
-        world.regenerateResources();
+        world.regenerateResources(Duration.ofMinutes(10));
 
-        assertEquals(ResourceType.BERRIES.regenPerTick(), bush.quantity(), EPSILON);
-        assertEquals(ResourceType.WATER.regenPerTick(), spring.quantity(), EPSILON);
+        assertEquals(ResourceType.BERRIES.regenPerTick(Duration.ofMinutes(10)), bush.quantity(), EPSILON);
+        assertEquals(ResourceType.WATER.regenPerTick(Duration.ofMinutes(10)), spring.quantity(), EPSILON);
         assertEquals(0.0, outcrop.quantity(), EPSILON);
     }
 

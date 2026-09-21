@@ -99,9 +99,9 @@ class DitheringTest {
         assertEquals(1, remembering.remembered().size());
 
         ActionCandidate seen = onlyCandidate(
-                new ApproachResourceProposer(1.0, 4.0, 4.0).propose(seeing, random()));
+                new ApproachResourceProposer(1.0).propose(seeing, random()));
         ActionCandidate recalled = onlyCandidate(
-                new ApproachRememberedProposer(1.0, 4.0, 4.0).propose(remembering, random()));
+                new ApproachRememberedProposer(1.0).propose(remembering, random()));
         assertTrue(seen.confidence() >= recalled.confidence(),
                 "seen " + seen.confidence() + " but remembered " + recalled.confidence());
     }

@@ -10,9 +10,12 @@ package dev.evoworld.core.agent;
  */
 public enum ActivityLevel {
 
-    /** Sitting still and recovering. */
+    /** Sitting still: a breather, which recovers a little. */
     RESTING,
 
     /** Moving, gathering, or anything else that takes effort. */
-    ACTIVE
+    ACTIVE,
+
+    /** Asleep: where energy comes back, and where a body mends fastest. */
+    SLEEPING
 }

@@ -55,10 +55,10 @@ class ScenarioTest {
         MetabolismRates normal = MetabolismRates.defaults();
         MetabolismRates hungry = built(Scenario.HUNGRY_WORLD).config().metabolism();
 
-        assertEquals(normal.hungerPerTick() * 1.5, hungry.hungerPerTick(), 1e-12);
-        assertEquals(normal.thirstPerTick() * 1.5, hungry.thirstPerTick(), 1e-12);
-        assertEquals(normal.starvationDamage(), hungry.starvationDamage());
-        assertEquals(normal.restingHealingPerTick(), hungry.restingHealingPerTick());
+        assertEquals(normal.hunger() * 1.5, hungry.hunger(), 1e-12);
+        assertEquals(normal.thirst() * 1.5, hungry.thirst(), 1e-12);
+        assertEquals(normal.starvation(), hungry.starvation());
+        assertEquals(normal.restingHealing(), hungry.restingHealing());
     }
 
     @Test

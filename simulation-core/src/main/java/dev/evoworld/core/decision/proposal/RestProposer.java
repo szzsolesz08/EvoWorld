@@ -16,22 +16,26 @@ import java.util.Locale;
 import java.util.Objects;
 
 /**
- * Offers to sit still: for energy when tired, and for health when hurt.
+ * Offers a breather: a little energy back, and faster mending when hurt.
  *
- * <p>Two candidates for the same action, one per goal it serves, so each is
- * weighed against how badly the agent wants that goal. Rest for health is only
- * offered when resting would heal - a starving agent heals nothing by sitting
- * down, and its time is better spent finding food.
+ * <p>Not how an agent gets its energy back - that is a night's sleep
+ * ({@link SleepProposer}). A rest is what is left when nothing else is worth a
+ * tick, or when the agent is hurt and sitting still would help it heal.
+ *
+ * <p>Two candidates for the same action, one per goal it serves, each weighed
+ * against how badly the agent wants that goal. Rest for health is only offered
+ * when resting would heal: a starving agent heals nothing by sitting down.
  */
 public final class RestProposer implements ActionProposer {
 
-    private final double energyGain;
-    private final double extraHealing;
+    private final double energyPerTick;
+    private final double extraHealingPerTick;
 
-    public RestProposer(double energyGain, MetabolismRates metabolism) {
+    /** @param metabolism one tick's worth of the body's rates */
+    public RestProposer(MetabolismRates metabolism) {
         Objects.requireNonNull(metabolism, "metabolism");
-        this.energyGain = energyGain;
-        this.extraHealing = metabolism.healingFor(ActivityLevel.RESTING)
+        this.energyPerTick = metabolism.energyChangeFor(ActivityLevel.RESTING);
+        this.extraHealingPerTick = metabolism.healingFor(ActivityLevel.RESTING)
                 - metabolism.healingFor(ActivityLevel.ACTIVE);
     }
 
@@ -39,19 +43,19 @@ public final class RestProposer implements ActionProposer {
     public List<ActionCandidate> propose(Perception perception, SimulationRandom random) {
         Needs needs = perception.needs();
         List<ActionCandidate> candidates = new ArrayList<>(2);
-        if (needs.energy() < Needs.MAX) {
+        if (needs.energy() < Needs.MAX && energyPerTick > 0.0) {
             candidates.add(ActionCandidate.here(
-                    new RestAction(energyGain),
+                    new RestAction(),
                     RecoverEnergyGoal.NAME,
-                    ExpectedRelief.fromResting(needs, energyGain),
+                    ExpectedRelief.fromResting(needs, energyPerTick),
                     0.0,
                     String.format(Locale.ROOT, "energy at %.1f", needs.energy())));
         }
-        if (!needs.isFullyHealthy() && needs.isWellEnoughToHeal() && extraHealing > 0.0) {
+        if (!needs.isFullyHealthy() && needs.isWellEnoughToHeal() && extraHealingPerTick > 0.0) {
             candidates.add(ActionCandidate.here(
-                    new RestAction(energyGain),
+                    new RestAction(),
                     RecoverHealthGoal.NAME,
-                    ExpectedRelief.fromHealing(needs, extraHealing),
+                    ExpectedRelief.fromHealing(needs, extraHealingPerTick),
                     0.0,
                     String.format(Locale.ROOT, "health at %.1f", needs.health())));
         }

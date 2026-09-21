@@ -151,10 +151,11 @@ class SurveyObserverTest {
     @Test
     @DisplayName("a wounded agent that mends is counted as mended, and when")
     void recordsARecovery() {
-        SeedResult result = run(new Needs(0.0, 0.0, 80.0, 95.0), 20);
+        // Resting mends about a point an hour: 98 is back to full within a few.
+        SeedResult result = run(new Needs(0.0, 0.0, 80.0, 98.0), 30);
 
         assertEquals(1, result.recoveries());
-        assertEquals(95.0, result.lowestHealth(), 1e-9);
+        assertEquals(98.0, result.lowestHealth(), 1e-9);
         assertTrue(result.ticksToFullHealth().isPresent());
         assertTrue(result.rests() > 0, "the script rests once it runs out");
     }
@@ -180,7 +181,7 @@ class SurveyObserverTest {
     }
 
     private static Decision rest() {
-        return new Decision(new RestAction(1.0), 0.1, "told to");
+        return new Decision(new RestAction(), 0.1, "told to");
     }
 
     /** Plays back a list of decisions, and rests once it runs out. */

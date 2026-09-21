@@ -11,6 +11,7 @@ import dev.evoworld.core.action.EatAction;
 import dev.evoworld.core.action.GatherAction;
 import dev.evoworld.core.action.MoveAction;
 import dev.evoworld.core.action.RestAction;
+import dev.evoworld.core.action.SleepAction;
 import dev.evoworld.core.agent.Agent;
 import dev.evoworld.core.agent.AgentId;
 import dev.evoworld.core.agent.Needs;
@@ -269,9 +270,15 @@ class DeliberativeDecisionMakerTest {
     class Tired {
 
         @Test
-        @DisplayName("it rests")
-        void restsWhenTired() {
-            assertEquals(RestAction.NAME, situation().body(0, 0, 15).chosenAction());
+        @DisplayName("it sleeps")
+        void sleepsWhenTired() {
+            assertEquals(SleepAction.NAME, situation().body(0, 0, 15).chosenAction());
+        }
+
+        @Test
+        @DisplayName("merely a little tired, it carries on: sleep is for the end of the day")
+        void doesNotNapWhenALittleTired() {
+            assertFalse(SleepAction.NAME.equals(situation().body(0, 0, 60).chosenAction()));
         }
 
         @Test
@@ -281,10 +288,10 @@ class DeliberativeDecisionMakerTest {
         }
 
         @Test
-        @DisplayName("too tired to walk anywhere, it rests rather than starting a trek")
+        @DisplayName("too tired to walk anywhere, it sleeps rather than starting a trek")
         void exhaustionBeatsTravelling() {
             assertEquals(
-                    RestAction.NAME,
+                    SleepAction.NAME,
                     situation().body(60, 60, 4).with(ResourceType.WATER, 2, 8).chosenAction());
         }
     }
@@ -301,12 +308,12 @@ class DeliberativeDecisionMakerTest {
         }
 
         @Test
-        @DisplayName("badly hurt with nothing new to find, it rests to mend rather than wander")
-        void restsToHealWhenIdle() {
+        @DisplayName("badly hurt with nothing new to find, it lies down to mend rather than wander")
+        void bedRestWhenIdle() {
             Deliberation hurt = situation().body(0, 0, 100, 10).knowingTheWorld().decide();
             Deliberation whole = situation().body(0, 0, 100, 100).knowingTheWorld().decide();
 
-            assertEquals(RestAction.NAME, hurt.chosen().action().name());
+            assertEquals(SleepAction.NAME, hurt.chosen().action().name());
             assertEquals(RecoverHealthGoal.NAME, hurt.chosen().goalName().orElseThrow());
             assertEquals(MoveAction.NAME, whole.chosen().action().name(), "a whole agent wanders");
         }
@@ -402,7 +409,7 @@ class DeliberativeDecisionMakerTest {
         @DisplayName("every option is scored, not just the winner")
         void everyCandidateIsScored() {
             Deliberation deliberation = situation()
-                    .body(50, 50, 50)
+                    .body(50, 50, 20)
                     .standingOn(ResourceType.WATER)
                     .with(ResourceType.BERRIES, 6, 8)
                     .carrying(ResourceType.BERRIES, 10.0)
@@ -412,7 +419,7 @@ class DeliberativeDecisionMakerTest {
                     deliberation.considered().stream().map(d -> d.action().name()).toList();
             assertTrue(considered.contains(DrinkAction.NAME), considered.toString());
             assertTrue(considered.contains(EatAction.NAME), considered.toString());
-            assertTrue(considered.contains(RestAction.NAME), considered.toString());
+            assertTrue(considered.contains(SleepAction.NAME), considered.toString());
             assertTrue(considered.contains(MoveAction.NAME), considered.toString());
             assertTrue(deliberation.considered().contains(deliberation.chosen()));
         }

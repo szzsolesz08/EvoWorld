@@ -31,9 +31,9 @@ public final class ScriptedDecisionMaker implements DecisionMaker {
     private final Action whenFinished;
     private final int scriptLength;
 
-    public ScriptedDecisionMaker(List<Action> script, double restEnergyGain) {
+    public ScriptedDecisionMaker(List<Action> script) {
         this.remaining = new ArrayDeque<>(script);
-        this.whenFinished = new RestAction(restEnergyGain);
+        this.whenFinished = new RestAction();
         this.scriptLength = script.size();
     }
 

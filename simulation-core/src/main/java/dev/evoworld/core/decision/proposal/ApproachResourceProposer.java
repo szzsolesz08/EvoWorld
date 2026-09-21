@@ -32,13 +32,19 @@ import java.util.Locale;
 public final class ApproachResourceProposer implements ActionProposer {
 
     private final double moveEnergyCost;
-    private final double eatPortion;
-    private final double drinkGulp;
 
-    public ApproachResourceProposer(double moveEnergyCost, double eatPortion, double drinkGulp) {
+    private final int stepsPerTick;
+    private final int gatherTicks;
+
+    public ApproachResourceProposer(double moveEnergyCost) {
+        this(moveEnergyCost, 1, 2);
+    }
+
+    /** @param gatherTicks how long picking food takes once there, before any of it is eaten */
+    public ApproachResourceProposer(double moveEnergyCost, int stepsPerTick, int gatherTicks) {
         this.moveEnergyCost = moveEnergyCost;
-        this.eatPortion = eatPortion;
-        this.drinkGulp = drinkGulp;
+        this.stepsPerTick = stepsPerTick;
+        this.gatherTicks = gatherTicks;
     }
 
     @Override
@@ -51,36 +57,45 @@ public final class ApproachResourceProposer implements ActionProposer {
                 continue;
             }
             Knowledge knowledge = perception.knowledge();
-            if (needs.thirst() > Needs.MIN
+            if (needs.thirst() >= Needs.NOTICEABLE
                     && ExpectedRelief.thinksItIsADrink(knowledge, seen.type())) {
                 candidates.add(approach(
                         seen,
                         SatisfyThirstGoal.NAME,
                         ExpectedRelief.fromDrinking(
                                 knowledge, needs, seen.type(),
-                                Math.min(drinkGulp, seen.quantity())),
-                        UntestedGuess.worthIt(knowledge, BeliefKind.HYDRATION, seen.type())));
+                                UntestedGuess.unitsExpected(
+                                        knowledge, BeliefKind.HYDRATION, seen.type(), seen.quantity())),
+                        UntestedGuess.worthIt(knowledge, BeliefKind.HYDRATION, seen.type()),
+                        0));
             }
-            if (needs.hunger() > Needs.MIN
+            if (needs.hunger() >= Needs.NOTICEABLE
                     && ExpectedRelief.thinksItIsFood(knowledge, seen.type())) {
                 candidates.add(approach(
                         seen,
                         SatisfyHungerGoal.NAME,
                         ExpectedRelief.fromEating(
                                 knowledge, needs, seen.type(),
-                                Math.min(eatPortion, seen.quantity())),
-                        UntestedGuess.worthIt(knowledge, BeliefKind.NOURISHMENT, seen.type())));
+                                UntestedGuess.unitsExpected(
+                                        knowledge, BeliefKind.NOURISHMENT, seen.type(), seen.quantity())),
+                        UntestedGuess.worthIt(knowledge, BeliefKind.NOURISHMENT, seen.type()),
+                        gatherTicks + 1));
             }
         }
         return List.copyOf(candidates);
     }
 
+    /**
+     * @param work ticks of work once there before the benefit lands: none for
+     *     a drink, which the arrival tick stands for; the picking and a meal
+     *     for food
+     */
     private ActionCandidate approach(
-            PerceivedResource target, String goal, double benefit, double worthIt) {
+            PerceivedResource target, String goal, double benefit, double worthIt, int work) {
         int steps = target.stepsAway();
         return ActionCandidate.heading(
                 target.location(),
-                new MoveAction(target.location(), moveEnergyCost),
+                new MoveAction(target.location(), moveEnergyCost, stepsPerTick),
                 goal,
                 benefit,
                 // Sure it is there - it can see it. Only as sure as experience
@@ -93,6 +108,7 @@ public final class ApproachResourceProposer implements ActionProposer {
                         "%s %d steps %s",
                         target.type().label(),
                         steps,
-                        target.direction().label()));
+                        target.direction().label()),
+                work);
     }
 }

@@ -139,7 +139,7 @@ public final class EvoWorldRunner {
 
         DecisionMaker decisionMaker = scripted
                 ? new ScriptedDecisionMaker(
-                        ActionScripts.forage(world, start, config), config.actions().restEnergyGain())
+                        ActionScripts.forage(world, start, config))
                 : DeliberativeDecisionMaker.from(config);
 
         return new Simulation(world, decisionMaker, config);

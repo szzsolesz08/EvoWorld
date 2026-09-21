@@ -11,6 +11,7 @@ import dev.evoworld.core.action.EatAction;
 import dev.evoworld.core.action.GatherAction;
 import dev.evoworld.core.action.MoveAction;
 import dev.evoworld.core.action.RestAction;
+import dev.evoworld.core.action.SleepAction;
 import dev.evoworld.core.agent.Agent;
 import dev.evoworld.core.agent.AgentId;
 import dev.evoworld.core.agent.Needs;
@@ -55,6 +56,9 @@ class AutonomousSimulationTest {
     /** Twenty simulated days at ten minutes a tick. */
     private static final long LONG_RUN = 2880L;
 
+    /** The most energy one tick's action can spend at the default settings: a step, or a gather. */
+    private static final double ONE_TICK_OF_WORK = 1.0;
+
     /**
      * Watches every tick and writes down anything that should not be possible.
      *
@@ -79,6 +83,10 @@ class AutonomousSimulationTest {
         private double lastHealth = Needs.MAX;
         double lowestHealth = Needs.MAX;
         int longestDithering;
+        long sleepTicks;
+        int sleeps;
+        int meals;
+        int drinks;
         String ditheringSeen = "";
 
         Auditor(Agent agent) {
@@ -88,6 +96,10 @@ class AutonomousSimulationTest {
         @Override
         public void onDecision(long tick, AgentId agentId, Decision chosen, List<Decision> considered) {
             lastChosen = chosen.action();
+            if (chosen.action().name().equals(SleepAction.NAME)) {
+                sleepTicks += chosen.action().durationTicks();
+                sleeps++;
+            }
             // Having been told something is impossible, choosing it again would
             // mean experience changed nothing.
             if (knownImpossible.contains(signature(chosen.action()))) {
@@ -99,6 +111,12 @@ class AutonomousSimulationTest {
         public void onActionPerformed(long tick, AgentId agentId, ActionOutcome outcome) {
             if (outcome.succeeded()) {
                 succeeded.add(outcome.actionName());
+                if (outcome.actionName().equals(EatAction.NAME)) {
+                    meals++;
+                }
+                if (outcome.actionName().equals(DrinkAction.NAME)) {
+                    drinks++;
+                }
             }
             if (outcome.wasImpossible() && lastChosen != null) {
                 knownImpossible.add(signature(lastChosen));
@@ -168,8 +186,13 @@ class AutonomousSimulationTest {
         /** A body only mends when it is looked after, and never while something is hurting it. */
         private void checkHealing(AgentSnapshot snapshot, long tick) {
             Needs needs = snapshot.needs();
+            // The body heals before the tick's action runs, and an action can
+            // spend a little energy after it, so energy is allowed that margin.
             if (needs.health() > lastHealth) {
-                check(needs.isWellEnoughToHeal(), tick, "healed while neglected " + needs);
+                check(needs.hunger() <= Needs.WELL_PRESSURE
+                                && needs.thirst() <= Needs.WELL_PRESSURE
+                                && needs.energy() >= Needs.WELL_ENERGY - ONE_TICK_OF_WORK,
+                        tick, "healed while neglected " + needs);
             }
             lastHealth = needs.health();
             lowestHealth = Math.min(lowestHealth, needs.health());
@@ -325,23 +348,80 @@ class AutonomousSimulationTest {
     }
 
     @Test
-    @DisplayName("the default run's first-day hunger is healed within three days")
-    void theFirstDayIsForgiven() {
-        // Seed 42 is the runner's default. A newborn goes hungry on day one
-        // while it learns berries are food; that used to cost health for good.
+    @DisplayName("a newborn works out what food is before hunger can hurt it")
+    void theFirstWeekIsSafe() {
+        // Seed 42 is the runner's default. When needs rose by the tick, a
+        // newborn starved on day one while it learned berries were food. With a
+        // realistic body it has days, and it uses them.
         SimulationConfig config = SimulationConfig.defaults(42L);
-        Run run = runAutonomously(config, 3 * 144L);
+        Run run = runAutonomously(config, 7 * 144L);
 
-        assertTrue(run.auditor().lowestHealth < Needs.MAX, "the scare should still happen");
-        assertEquals(Needs.MAX, run.agent().needs().health(), 1e-9);
-        assertEquals(1L, run.auditor().count(SimulationEvent.Recovered.class));
+        assertEquals(Needs.MAX, run.auditor().lowestHealth, 1e-9, "never hurt");
+        assertEquals(0L, run.auditor().count(SimulationEvent.DangerBegan.class));
+        assertFalse(run.agent().knowledge()
+                        .believe(dev.evoworld.core.knowledge.BeliefKind.NOURISHMENT, ResourceType.BERRIES)
+                        .isAssumed(),
+                "should have tasted berries by now");
         assertEquals(List.of(), run.auditor().violations);
+    }
+
+    /** A day in a run, averaged: what the body asked of it. */
+    private record Rhythm(double sleepHours, double sleeps, double meals, double drinks) {
+
+        static Rhythm of(Run run, Duration tick) {
+            double days = run.ticksRun() * tick.getSeconds() / 86_400.0;
+            double hours = run.auditor().sleepTicks * tick.getSeconds() / 3_600.0;
+            return new Rhythm(hours / days, run.auditor().sleeps / days,
+                    run.auditor().meals / days, run.auditor().drinks / days);
+        }
+    }
+
+    @ParameterizedTest(name = "seed {0}")
+    @ValueSource(longs = {1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L})
+    @DisplayName("a day like a person's: one night's sleep, a few meals and drinks, and no danger")
+    void livesARealisticDay(long seed) {
+        Run run = runAutonomously(seed, LONG_RUN);
+        Rhythm day = Rhythm.of(run, SimulationConfig.DEFAULT_TICK_DURATION);
+
+        assertEquals(List.of(), run.auditor().violations);
+        assertEquals(0L, run.auditor().count(SimulationEvent.DangerBegan.class), "never in danger");
+        assertTrue(day.sleepHours() >= 7.0 && day.sleepHours() <= 10.0, "sleep " + day);
+        assertTrue(day.sleeps() >= 0.9 && day.sleeps() <= 1.5, "about one night a day " + day);
+        assertTrue(day.meals() >= 1.5 && day.meals() <= 4.5, "meals " + day);
+        assertTrue(day.drinks() >= 2.0 && day.drinks() <= 9.0, "drinks " + day);
+    }
+
+    @Test
+    @DisplayName("the day looks the same whether time is cut into 10- or 30-minute ticks")
+    void theRhythmDoesNotDependOnTheTickLength() {
+        Duration fine = Duration.ofMinutes(10);
+        Duration coarse = Duration.ofMinutes(30);
+        double[] atFine = new double[3];
+        double[] atCoarse = new double[3];
+        for (long seed = 1; seed <= 4; seed++) {
+            Rhythm a = Rhythm.of(runAutonomously(SimulationConfig.defaults(seed).withTickDuration(fine),
+                    Needs.healthy(), 20 * 144L), fine);
+            Rhythm b = Rhythm.of(runAutonomously(SimulationConfig.defaults(seed).withTickDuration(coarse),
+                    Needs.healthy(), 20 * 48L), coarse);
+            atFine[0] += a.sleepHours();
+            atFine[1] += a.meals();
+            atFine[2] += a.drinks();
+            atCoarse[0] += b.sleepHours();
+            atCoarse[1] += b.meals();
+            atCoarse[2] += b.drinks();
+        }
+        String[] what = {"sleep hours", "meals", "drinks"};
+        for (int i = 0; i < 3; i++) {
+            double ratio = atCoarse[i] / atFine[i];
+            assertTrue(ratio > 0.75 && ratio < 1.25,
+                    what[i] + " a day: " + atFine[i] / 4 + " at 10 minutes, " + atCoarse[i] / 4 + " at 30");
+        }
     }
 
     // --- capability -------------------------------------------------------
 
     @Test
-    @DisplayName("left alone, the agent survives, forages, drinks, rests, explores, learns and improves")
+    @DisplayName("left alone, the agent survives, forages, drinks, sleeps, explores, learns and improves")
     void doesEverythingAnAutonomousAgentShould() {
         Run run = runAutonomously(7L, LONG_RUN);
         Agent atlas = run.agent();
@@ -353,7 +433,7 @@ class AutonomousSimulationTest {
 
         // moving, gathering, eating, drinking, resting
         for (String action : List.of(
-                MoveAction.NAME, GatherAction.NAME, EatAction.NAME, DrinkAction.NAME, RestAction.NAME)) {
+                MoveAction.NAME, GatherAction.NAME, EatAction.NAME, DrinkAction.NAME, SleepAction.NAME)) {
             assertTrue(seen.succeeded.contains(action), "never managed to " + action);
         }
 

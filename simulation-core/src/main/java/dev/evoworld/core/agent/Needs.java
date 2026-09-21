@@ -24,6 +24,13 @@ public record Needs(double hunger, double thirst, double energy, double health) 
     /** Above this, a pressure starts damaging health. */
     public static final double CRITICAL_PRESSURE = 95.0;
 
+    /**
+     * Below this, hunger or thirst is not felt at all: nobody eats or drinks,
+     * or walks anywhere to, for a need they cannot yet notice. About two and a
+     * half hours after a drink, or seven after a meal.
+     */
+    public static final double NOTICEABLE = 5.0;
+
     /** At or below this, hunger and thirst leave a body free to heal. */
     public static final double WELL_PRESSURE = 50.0;
 
@@ -110,35 +117,48 @@ public record Needs(double hunger, double thirst, double energy, double health) 
     }
 
     /**
-     * Applies one tick of metabolism: pressures rise, energy drains at the rate
-     * the activity costs, unmet needs take their toll on health, and a body
-     * that is well looked after mends a little - more if it spent the tick at
-     * rest.
+     * Applies one tick of metabolism: pressures rise, energy drains or comes
+     * back depending on what the tick was spent doing, unmet needs take their
+     * toll on health, and a body that is well looked after mends a little -
+     * most while asleep.
+     *
+     * <p>{@code rates} are one tick's worth, and comfort scales only what comes
+     * back: the energy recovered and the healing, never the cost.
      *
      * <p>A pure function of the current state, which keeps the rule
      * deterministic and directly testable.
      */
-    public Needs afterTick(MetabolismRates rates, ActivityLevel activity) {
-        double nextHunger = hunger + rates.hungerPerTick();
-        double nextThirst = thirst + rates.thirstPerTick();
-        double nextEnergy = energy - rates.energyDrainFor(activity);
+    public Needs afterTick(MetabolismRates rates, Exertion exertion) {
+        double nextHunger = hunger + rates.hunger();
+        double nextThirst = thirst + rates.thirst();
+        double energyChange = rates.energyChangeFor(exertion.level());
+        if (energyChange > 0.0) {
+            energyChange *= exertion.comfort();
+        }
 
-        Needs drained = new Needs(nextHunger, nextThirst, nextEnergy, health);
+        Needs drained = new Needs(nextHunger, nextThirst, energy + energyChange, health);
         Needs harmed = drained.harm(damageFrom(drained, rates));
-        return harmed.isWellEnoughToHeal() ? harmed.heal(rates.healingFor(activity)) : harmed;
+        return harmed.isWellEnoughToHeal()
+                ? harmed.heal(rates.healingFor(exertion.level()) * exertion.comfort())
+                : harmed;
+    }
+
+    /** One tick at this level of activity, with no help. */
+    public Needs afterTick(MetabolismRates rates, ActivityLevel activity) {
+        return afterTick(rates, Exertion.of(activity));
     }
 
     /** Health lost this tick to needs that have gone unmet. */
     private static double damageFrom(Needs needs, MetabolismRates rates) {
         double damage = 0.0;
         if (needs.isStarving()) {
-            damage += rates.starvationDamage();
+            damage += rates.starvation();
         }
         if (needs.isDehydrated()) {
-            damage += rates.dehydrationDamage();
+            damage += rates.dehydration();
         }
         if (needs.isExhausted()) {
-            damage += rates.exhaustionDamage();
+            damage += rates.exhaustion();
         }
         return damage;
     }

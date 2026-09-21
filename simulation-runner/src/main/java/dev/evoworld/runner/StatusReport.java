@@ -1,6 +1,7 @@
 package dev.evoworld.runner;
 
 import dev.evoworld.core.Simulation;
+import dev.evoworld.core.action.SleepAction;
 import dev.evoworld.core.agent.Needs;
 import dev.evoworld.core.decision.Decision;
 import dev.evoworld.core.goal.GoalPriority;
@@ -119,7 +120,7 @@ public final class StatusReport implements SimulationObserver {
             // last decision has already happened - it was carried out this
             // tick, and saying the agent is still doing it would be wrong.
             row(lines, status.busyFor() > 0 ? "doing" : "last act", status.doing()
-                    .map(decision -> describe(decision, status.busyFor()))
+                    .map(decision -> describe(decision, status.busyFor(), tickDuration))
                     .orElse("(not decided yet)"));
             row(lines, "intent", body.intent()
                     .map(intent -> describe(intent, body.location(), status.time().tick()))
@@ -158,12 +159,25 @@ public final class StatusReport implements SimulationObserver {
     }
 
     /** The action, and the reason without the arithmetic. */
-    private static String describe(Decision decision, long busyFor) {
+    private static String describe(Decision decision, long busyFor, Duration tickDuration) {
+        if (busyFor > 0 && decision.action().name().equals(SleepAction.NAME)) {
+            return "sleeping, " + span(tickDuration.multipliedBy(busyFor)) + " left";
+        }
         String reason = decision.rationale();
         int numbers = reason.indexOf(" want ");
         String why = numbers < 0 ? reason : reason.substring(0, numbers);
         String busy = busyFor > 0 ? " (" + busyFor + " tick(s) to go)" : "";
         return decision.action() + ", for " + why + busy;
+    }
+
+    /** "5h 10m", "40m". */
+    static String span(Duration duration) {
+        long hours = duration.toHours();
+        long minutes = duration.toMinutesPart();
+        if (hours == 0) {
+            return minutes + "m";
+        }
+        return minutes == 0 ? hours + "h" : hours + "h " + minutes + "m";
     }
 
     private static String describe(Recollection recalled) {

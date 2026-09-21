@@ -2,6 +2,7 @@ package dev.evoworld.core.action;
 
 import dev.evoworld.core.agent.ActivityLevel;
 import dev.evoworld.core.agent.Agent;
+import dev.evoworld.core.agent.Exertion;
 import dev.evoworld.core.resource.ResourceType;
 import dev.evoworld.core.world.World;
 import java.util.Optional;
@@ -45,6 +46,36 @@ public abstract class Action {
      */
     public ActivityLevel activityLevel() {
         return ActivityLevel.ACTIVE;
+    }
+
+    /**
+     * What each tick of this asks of the body: its activity level, and how
+     * comfortably it recovers. Only something that brings its own comfort - a
+     * sleep in a bed - needs to say more than its level.
+     */
+    public Exertion exertion() {
+        return Exertion.of(activityLevel());
+    }
+
+    /**
+     * How many ticks until this starts doing any good.
+     *
+     * <p>Usually when it is finished: a gather is worth nothing half done. An
+     * action whose benefit accrues as it goes - a night's sleep - says it
+     * starts at once, so a long sleep is not valued as if its reward only
+     * arrived in the morning.
+     */
+    public int ticksUntilBenefit() {
+        return durationTicks();
+    }
+
+    /**
+     * How many tiles this covers in a tick, for an action that travels; one
+     * otherwise. Walking speed is set in simulated time, so at longer ticks a
+     * single move covers more ground.
+     */
+    public int stepsPerTick() {
+        return 1;
     }
 
     /**

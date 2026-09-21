@@ -19,6 +19,7 @@ import java.util.Objects;
  * @param underwayTicksRemaining how much of that action is left
  * @param lastActivity how hard it worked last tick, which is what the next
  *     tick will charge it for
+ * @param lastComfort how comfortably it recovered doing it
  * @param dangers which needs were already doing damage, so the next tick does
  *     not report them as starting again
  * @param intent where it had set out for, or null
@@ -44,6 +45,7 @@ public record SavedAgent(
         SavedAction underway,
         long underwayTicksRemaining,
         ActivityLevel lastActivity,
+        double lastComfort,
         List<Danger> dangers,
         SavedIntent intent) {
 

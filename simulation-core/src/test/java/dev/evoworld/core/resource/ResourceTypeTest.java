@@ -4,12 +4,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.params.ParameterizedTest;
 import org.junit.jupiter.params.provider.EnumSource;
 
 class ResourceTypeTest {
+
+    /** The default tick; regrowth is per hour, applied a tick at a time. */
+    private static final Duration TICK = Duration.ofMinutes(10);
 
     @Test
     @DisplayName("the world has exactly the four resources the milestone calls for")
@@ -26,9 +30,9 @@ class ResourceTypeTest {
     @DisplayName("every type holds a positive amount and regrows at a sane rate")
     void everyTypeIsWellFormed(ResourceType type) {
         assertTrue(type.capacity() > 0.0, type + " must hold something");
-        assertTrue(type.regenPerTick() >= 0.0, type + " must not regrow backwards");
+        assertTrue(type.regenPerTick(TICK) >= 0.0, type + " must not regrow backwards");
         assertTrue(
-                type.regenPerTick() <= type.capacity(),
+                type.regenPerTick(TICK) <= type.capacity(),
                 type + " must not refill more than it can hold in one tick");
     }
 
@@ -44,18 +48,18 @@ class ResourceTypeTest {
     @Test
     @DisplayName("regrowth times rank the way the resources should feel")
     void regrowthTimesAreOrdered() {
-        long water = ResourceType.WATER.ticksToFullFromEmpty().orElseThrow();
-        long berries = ResourceType.BERRIES.ticksToFullFromEmpty().orElseThrow();
-        long wood = ResourceType.WOOD.ticksToFullFromEmpty().orElseThrow();
+        long water = ResourceType.WATER.ticksToFullFromEmpty(TICK).orElseThrow();
+        long berries = ResourceType.BERRIES.ticksToFullFromEmpty(TICK).orElseThrow();
+        long wood = ResourceType.WOOD.ticksToFullFromEmpty(TICK).orElseThrow();
 
         assertTrue(water < berries, "a spring refills faster than a bush fruits");
         assertTrue(berries < wood, "a bush fruits faster than a tree grows");
-        assertTrue(ResourceType.STONE.ticksToFullFromEmpty().isEmpty());
+        assertTrue(ResourceType.STONE.ticksToFullFromEmpty(TICK).isEmpty());
     }
 
     @Test
     @DisplayName("a bush refills within a day of ten-minute ticks")
     void berriesRegrowWithinADay() {
-        assertEquals(48L, ResourceType.BERRIES.ticksToFullFromEmpty().orElseThrow());
+        assertEquals(48L, ResourceType.BERRIES.ticksToFullFromEmpty(TICK).orElseThrow());
     }
 }

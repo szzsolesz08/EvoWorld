@@ -314,7 +314,7 @@ class LearningChangesBehaviourTest {
             World world = new World(CONFIG.bounds());
             Agent agent = agentWith(Needs.healthy());
 
-            experience(agent, world, new dev.evoworld.core.action.RestAction(6.0));
+            experience(agent, world, new dev.evoworld.core.action.RestAction());
 
             assertTrue(agent.knowledge().isEmpty(), "resting says nothing about the world");
         }

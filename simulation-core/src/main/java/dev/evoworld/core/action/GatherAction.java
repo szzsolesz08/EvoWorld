@@ -23,13 +23,21 @@ import java.util.Optional;
 public final class GatherAction extends Action {
 
     public static final String NAME = "GATHER";
-    private static final int TICKS = 2;
+    /** Twenty minutes at the default ten-minute tick. */
+    private static final int DEFAULT_TICKS = 2;
 
     private final ResourceType target;
     private final double amount;
     private final double energyCost;
+    private final int ticks;
 
+    /** A gather of the default length. */
     public GatherAction(ResourceType target, double amount, double energyCost) {
+        this(target, amount, energyCost, DEFAULT_TICKS);
+    }
+
+    /** @param ticks how many ticks the work takes, from the gather time and the tick length */
+    public GatherAction(ResourceType target, double amount, double energyCost, int ticks) {
         this.target = Objects.requireNonNull(target, "target");
         if (amount <= 0.0) {
             throw new IllegalArgumentException("must gather something, was " + amount);
@@ -37,8 +45,12 @@ public final class GatherAction extends Action {
         if (energyCost < 0.0) {
             throw new IllegalArgumentException("gathering cannot give energy back");
         }
+        if (ticks < 1) {
+            throw new IllegalArgumentException("a gather takes at least one tick, was " + ticks);
+        }
         this.amount = amount;
         this.energyCost = energyCost;
+        this.ticks = ticks;
     }
 
     public ResourceType target() {
@@ -60,7 +72,7 @@ public final class GatherAction extends Action {
 
     @Override
     public int durationTicks() {
-        return TICKS;
+        return ticks;
     }
 
     @Override
@@ -113,12 +125,13 @@ public final class GatherAction extends Action {
         return other instanceof GatherAction gather
                 && target == gather.target
                 && Double.compare(amount, gather.amount) == 0
-                && Double.compare(energyCost, gather.energyCost) == 0;
+                && Double.compare(energyCost, gather.energyCost) == 0
+                && ticks == gather.ticks;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(target, amount, energyCost);
+        return Objects.hash(target, amount, energyCost, ticks);
     }
 
     @Override

@@ -31,7 +31,7 @@ public final class EatProposer implements ActionProposer {
 
     @Override
     public List<ActionCandidate> propose(Perception perception, SimulationRandom random) {
-        if (perception.needs().hunger() <= Needs.MIN) {
+        if (perception.needs().hunger() < Needs.NOTICEABLE) {
             return List.of();
         }
 
@@ -46,8 +46,13 @@ public final class EatProposer implements ActionProposer {
             candidates.add(new ActionCandidate(
                     new EatAction(type, meal),
                     SatisfyHungerGoal.NAME,
+                    // What the food in hand can do for this hunger, on the same
+                    // measure as a trip to food elsewhere; one portion is what a
+                    // single meal eats of it.
                     ExpectedRelief.fromEating(
-                            perception.knowledge(), perception.needs(), type, meal),
+                            perception.knowledge(), perception.needs(), type,
+                            UntestedGuess.unitsExpected(
+                                    perception.knowledge(), BeliefKind.NOURISHMENT, type, carried)),
                     Math.max(
                             perception.knowledge().confidence(BeliefKind.NOURISHMENT, type),
                             UntestedGuess.CONFIDENCE),

@@ -1,5 +1,6 @@
 package dev.evoworld.core.resource;
 
+import java.time.Duration;
 import dev.evoworld.core.world.Location;
 import java.util.Locale;
 import java.util.Objects;
@@ -107,16 +108,16 @@ public final class ResourceNode {
     }
 
     /**
-     * Applies one tick of regrowth, up to the node's capacity.
+     * Applies one tick of regrowth, for a tick of {@code tick}, up to the node's capacity.
      *
      * <p>Non-renewable types are unaffected, and an empty renewable node does
      * recover - a picked bush grows its berries back.
      */
-    public void regenerate() {
+    public void regenerate(Duration tick) {
         if (!type.isRenewable()) {
             return;
         }
-        quantity = Math.min(capacity, quantity + type.regenPerTick());
+        quantity = Math.min(capacity, quantity + type.regenPerTick(tick));
     }
 
     public ResourceSnapshot snapshot() {

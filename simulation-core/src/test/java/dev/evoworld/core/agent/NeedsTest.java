@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -14,7 +15,7 @@ import org.junit.jupiter.params.provider.CsvSource;
 class NeedsTest {
 
     private static final double EPSILON = 1e-9;
-    private final MetabolismRates rates = MetabolismRates.defaults();
+    private final MetabolismRates rates = MetabolismRates.defaults().perTick(Duration.ofMinutes(10));
 
     @Nested
     @DisplayName("valid ranges")
@@ -218,8 +219,8 @@ class NeedsTest {
         void pressuresRiseEveryTick() {
             Needs after = Needs.healthy().afterTick(rates, ActivityLevel.ACTIVE);
 
-            assertEquals(rates.hungerPerTick(), after.hunger(), EPSILON);
-            assertEquals(rates.thirstPerTick(), after.thirst(), EPSILON);
+            assertEquals(rates.hunger(), after.hunger(), EPSILON);
+            assertEquals(rates.thirst(), after.thirst(), EPSILON);
             assertEquals(Needs.MAX, after.health(), EPSILON, "health is untouched while needs are met");
         }
 
@@ -239,8 +240,8 @@ class NeedsTest {
             Needs active = Needs.healthy().afterTick(rates, ActivityLevel.ACTIVE);
             Needs resting = Needs.healthy().afterTick(rates, ActivityLevel.RESTING);
 
-            assertEquals(Needs.MAX - rates.activeEnergyPerTick(), active.energy(), EPSILON);
-            assertEquals(Needs.MAX - rates.restingEnergyPerTick(), resting.energy(), EPSILON);
+            assertEquals(Needs.MAX - -rates.activeEnergy(), active.energy(), EPSILON);
+            assertEquals(Needs.MAX - -rates.restingEnergy(), resting.energy(), EPSILON);
             assertTrue(resting.energy() > active.energy(), "resting must be the cheaper option");
         }
 
@@ -262,7 +263,7 @@ class NeedsTest {
 
             Needs after = starving.afterTick(rates, ActivityLevel.ACTIVE);
 
-            double expectedDamage = rates.starvationDamage() + rates.dehydrationDamage();
+            double expectedDamage = rates.starvation() + rates.dehydration();
             assertEquals(Needs.MAX - expectedDamage, after.health(), EPSILON);
         }
 
@@ -274,7 +275,7 @@ class NeedsTest {
             Needs after = drained.afterTick(rates, ActivityLevel.ACTIVE);
 
             assertEquals(Needs.MIN, after.energy(), EPSILON);
-            assertEquals(Needs.MAX - rates.exhaustionDamage(), after.health(), EPSILON);
+            assertEquals(Needs.MAX - rates.exhaustion(), after.health(), EPSILON);
         }
 
         @Test
@@ -284,8 +285,8 @@ class NeedsTest {
 
             Needs after = wretched.afterTick(rates, ActivityLevel.ACTIVE);
 
-            double expected = rates.starvationDamage() + rates.dehydrationDamage()
-                    + rates.exhaustionDamage();
+            double expected = rates.starvation() + rates.dehydration()
+                    + rates.exhaustion();
             assertEquals(Needs.MAX - expected, after.health(), EPSILON);
         }
 
@@ -293,12 +294,12 @@ class NeedsTest {
         @DisplayName("damage is judged on the state the tick produced, not the one it started from")
         void damageUsesThePostTickState() {
             // One tick below the threshold; the tick itself pushes it over.
-            Needs almost = new Needs(Needs.CRITICAL_PRESSURE - rates.hungerPerTick(), 0.0, 50.0, 100.0);
+            Needs almost = new Needs(Needs.CRITICAL_PRESSURE - rates.hunger(), 0.0, 50.0, 100.0);
 
             Needs after = almost.afterTick(rates, ActivityLevel.ACTIVE);
 
             assertTrue(after.isStarving());
-            assertEquals(Needs.MAX - rates.starvationDamage(), after.health(), EPSILON);
+            assertEquals(Needs.MAX - rates.starvation(), after.health(), EPSILON);
         }
 
         @Test
@@ -328,6 +329,63 @@ class NeedsTest {
     }
 
     @Nested
+    @DisplayName("sleep and comfort")
+    class Sleep {
+
+        @Test
+        @DisplayName("only sleep brings energy back; resting only slows the drain")
+        void onlySleepRecovers() {
+            Needs tired = new Needs(10.0, 10.0, 30.0, 100.0);
+
+            double active = tired.afterTick(rates, ActivityLevel.ACTIVE).energy();
+            double resting = tired.afterTick(rates, ActivityLevel.RESTING).energy();
+            double asleep = tired.afterTick(rates, ActivityLevel.SLEEPING).energy();
+
+            assertTrue(active < resting, "resting drains more slowly than working");
+            assertTrue(resting < 30.0, "but it still drains");
+            assertEquals(30.0 + rates.sleepingEnergy(), asleep, EPSILON);
+        }
+
+        @Test
+        @DisplayName("a body mends fastest asleep")
+        void sleepHealsMost() {
+            Needs hurt = new Needs(10.0, 10.0, 60.0, 50.0);
+
+            double resting = hurt.afterTick(rates, ActivityLevel.RESTING).health();
+            double asleep = hurt.afterTick(rates, ActivityLevel.SLEEPING).health();
+
+            assertEquals(50.0 + rates.sleepingHealing(), asleep, EPSILON);
+            assertTrue(asleep > resting);
+        }
+
+        @Test
+        @DisplayName("comfort - a bed - multiplies what comes back, never what it costs")
+        void comfortScalesRecoveryOnly() {
+            Needs tired = new Needs(10.0, 10.0, 30.0, 50.0);
+            Exertion ground = Exertion.of(ActivityLevel.SLEEPING);
+            Exertion bed = new Exertion(ActivityLevel.SLEEPING, 1.5);
+
+            Needs onTheGround = tired.afterTick(rates, ground);
+            Needs inBed = tired.afterTick(rates, bed);
+
+            assertEquals(30.0 + 1.5 * rates.sleepingEnergy(), inBed.energy(), EPSILON);
+            assertEquals(50.0 + 1.5 * rates.sleepingHealing(), inBed.health(), EPSILON);
+            assertEquals(onTheGround.hunger(), inBed.hunger(), EPSILON);
+            assertEquals(onTheGround.thirst(), inBed.thirst(), EPSILON);
+            Needs working = tired.afterTick(rates, new Exertion(ActivityLevel.ACTIVE, 1.5));
+            assertEquals(30.0 + rates.activeEnergy(), working.energy(), EPSILON,
+                    "comfort does not make work any cheaper");
+        }
+
+        @Test
+        @DisplayName("comfort must be positive")
+        void comfortIsPositive() {
+            assertThrows(IllegalArgumentException.class, () -> new Exertion(ActivityLevel.SLEEPING, 0.0));
+            assertThrows(IllegalArgumentException.class, () -> new Exertion(ActivityLevel.SLEEPING, -1.0));
+        }
+    }
+
+    @Nested
     @DisplayName("healing")
     class Healing {
 
@@ -338,7 +396,7 @@ class NeedsTest {
 
             Needs after = hurt.afterTick(rates, ActivityLevel.ACTIVE);
 
-            assertEquals(60.0 + rates.healingPerTick(), after.health(), EPSILON);
+            assertEquals(60.0 + rates.activeHealing(), after.health(), EPSILON);
         }
 
         @Test
@@ -349,7 +407,7 @@ class NeedsTest {
             double active = hurt.afterTick(rates, ActivityLevel.ACTIVE).health();
             double resting = hurt.afterTick(rates, ActivityLevel.RESTING).health();
 
-            assertEquals(60.0 + rates.restingHealingPerTick(), resting, EPSILON);
+            assertEquals(60.0 + rates.restingHealing(), resting, EPSILON);
             assertTrue(resting > active);
         }
 
@@ -409,9 +467,11 @@ class NeedsTest {
         @DisplayName("resting may not heal less than being active, and nothing heals backwards")
         void healingRatesAreSensible() {
             assertThrows(IllegalArgumentException.class,
-                    () -> new MetabolismRates(0.8, 1.2, 0.5, 0.1, 1.5, 2.0, 1.0, 0.5, 0.1));
+                    () -> new MetabolismRates(0.7, 2.0, -5.0, -1.5, 10.0, 0.6, 4.0, 2.0, 0.5, 0.1, 2.0));
             assertThrows(IllegalArgumentException.class,
-                    () -> new MetabolismRates(0.8, 1.2, 0.5, 0.1, 1.5, 2.0, 1.0, -0.1, 0.5));
+                    () -> new MetabolismRates(0.7, 2.0, -5.0, -1.5, 10.0, 0.6, 4.0, 2.0, 0.25, 1.0, 0.5));
+            assertThrows(IllegalArgumentException.class,
+                    () -> new MetabolismRates(0.7, 2.0, -5.0, -1.5, 10.0, 0.6, 4.0, 2.0, -0.1, 1.0, 2.0));
         }
     }
 }

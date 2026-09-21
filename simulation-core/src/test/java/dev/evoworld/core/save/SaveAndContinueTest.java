@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import dev.evoworld.core.Simulation;
 import dev.evoworld.core.SimulationConfig;
 import dev.evoworld.core.action.ActionOutcome;
+import dev.evoworld.core.action.SleepAction;
 import dev.evoworld.core.agent.Agent;
 import dev.evoworld.core.agent.AgentId;
 import dev.evoworld.core.agent.Needs;
@@ -127,6 +128,37 @@ class SaveAndContinueTest {
         resumed.run(50);
 
         assertEquals(unbroken.snapshot(), resumed.snapshot());
+    }
+
+    @Test
+    @DisplayName("a save taken in the middle of a night's sleep sleeps on to the same morning")
+    void aSleepSurvivesASave() {
+        Simulation probe = fresh(7L);
+        long midSleep = -1;
+        for (long tick = 1; tick <= 3 * TOTAL && midSleep < 0; tick++) {
+            probe.tick();
+            SavedAction underway = probe.save().agents().get(0).underway();
+            if (underway != null && underway.kind().equals(SleepAction.NAME)
+                    && probe.save().agents().get(0).underwayTicksRemaining() > 5) {
+                midSleep = tick;
+            }
+        }
+        assertTrue(midSleep > 0, "the run should sleep at some point");
+
+        Simulation unbroken = fresh(7L);
+        Transcript whole = new Transcript();
+        unbroken.addObserver(whole);
+        unbroken.run(midSleep + 120);
+
+        Simulation interrupted = fresh(7L);
+        interrupted.run(midSleep);
+        Simulation resumed = Simulation.load(interrupted.save());
+        Transcript rest = new Transcript();
+        resumed.addObserver(rest);
+        resumed.run(120);
+
+        assertEquals(whole.from(midSleep), rest.lines);
+        assertEquals(unbroken.save(), resumed.save());
     }
 
     @Test

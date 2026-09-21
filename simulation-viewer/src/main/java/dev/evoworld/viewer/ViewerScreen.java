@@ -16,6 +16,7 @@ import com.badlogic.gdx.graphics.glutils.ShapeRenderer;
 import com.badlogic.gdx.utils.Align;
 import com.badlogic.gdx.utils.ScreenUtils;
 import dev.evoworld.core.Simulation;
+import dev.evoworld.core.action.SleepAction;
 import dev.evoworld.core.agent.Needs;
 import dev.evoworld.core.event.SimulationEvent;
 import dev.evoworld.core.intent.Intent;
@@ -52,6 +53,7 @@ final class ViewerScreen extends ApplicationAdapter {
     private static final Color TEXT = new Color(0.86f, 0.88f, 0.90f, 1f);
     private static final Color DIM = new Color(0.55f, 0.58f, 0.62f, 1f);
     private static final Color ATLAS = new Color(0.98f, 0.84f, 0.30f, 1f);
+    private static final Color ASLEEP = new Color(0.55f, 0.50f, 0.32f, 1f);
     private static final Color INTENT = new Color(0.98f, 0.84f, 0.30f, 0.55f);
     private static final Color GOOD = new Color(0.36f, 0.75f, 0.45f, 1f);
     private static final Color WARN = new Color(0.93f, 0.62f, 0.25f, 1f);
@@ -235,13 +237,20 @@ final class ViewerScreen extends ApplicationAdapter {
         shapes.end();
 
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        shapes.setColor(atlas.alive() ? ATLAS : DIM);
+        shapes.setColor(!atlas.alive() ? DIM : isAsleep() ? ASLEEP : ATLAS);
         shapes.circle(layout.centreX(atlas.location()), layout.centreY(atlas.location()),
                 layout.tile() * 0.30f, 24);
         shapes.setColor(BACKGROUND);
         shapes.circle(layout.centreX(atlas.location()), layout.centreY(atlas.location()),
                 layout.tile() * 0.10f, 12);
         shapes.end();
+    }
+
+    /** Whether the latest decision was a sleep that is still going on. */
+    private boolean isAsleep() {
+        AgentStatus status = model.status();
+        return status.busyFor() > 0
+                && status.doing().filter(decision -> decision.action().name().equals(SleepAction.NAME)).isPresent();
     }
 
     private void drawIntent(MapLayout layout, AgentSnapshot atlas, Intent intent) {

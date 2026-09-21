@@ -136,15 +136,17 @@ public record Scenario(
     static MetabolismRates hungrier(double factor) {
         MetabolismRates normal = MetabolismRates.defaults();
         return new MetabolismRates(
-                normal.hungerPerTick() * factor,
-                normal.thirstPerTick() * factor,
-                normal.activeEnergyPerTick(),
-                normal.restingEnergyPerTick(),
-                normal.starvationDamage(),
-                normal.dehydrationDamage(),
-                normal.exhaustionDamage(),
-                normal.healingPerTick(),
-                normal.restingHealingPerTick());
+                normal.hunger() * factor,
+                normal.thirst() * factor,
+                normal.activeEnergy(),
+                normal.restingEnergy(),
+                normal.sleepingEnergy(),
+                normal.starvation(),
+                normal.dehydration(),
+                normal.exhaustion(),
+                normal.activeHealing(),
+                normal.restingHealing(),
+                normal.sleepingHealing());
     }
 
     /** Half of every kind of resource, but never none of one. */

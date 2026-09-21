@@ -107,7 +107,7 @@ class SkillsTest {
     void onlySomeActionsAreTrainable() {
         assertTrue(new MoveAction(new Location(1, 1), 1.0).trainable());
         assertTrue(new GatherAction(ResourceType.BERRIES, 1.0, 1.0).trainable());
-        assertTrue(!new dev.evoworld.core.action.RestAction(1.0).trainable());
+        assertTrue(!new dev.evoworld.core.action.RestAction().trainable());
         assertTrue(!new dev.evoworld.core.action.EatAction(ResourceType.BERRIES, 1.0).trainable());
     }
 }

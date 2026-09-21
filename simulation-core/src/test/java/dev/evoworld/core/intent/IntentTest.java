@@ -226,7 +226,7 @@ class IntentTest {
     }
 
     private static Decision rest() {
-        return new Decision(new RestAction(1.0), 0.1, "told to");
+        return new Decision(new RestAction(), 0.1, "told to");
     }
 
     /** Plays back a list of decisions, and rests once it runs out. */

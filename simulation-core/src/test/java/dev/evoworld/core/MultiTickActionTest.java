@@ -117,7 +117,8 @@ class MultiTickActionTest {
         simulation.run(2);
 
         assertEquals(2L, agent.ticksAlive());
-        assertEquals(50.0 + 2 * CONFIG.metabolism().hungerPerTick(), agent.needs().hunger(), EPSILON);
+        assertEquals(50.0 + 2 * CONFIG.metabolism().perTick(CONFIG.tickDuration()).hunger(),
+                agent.needs().hunger(), EPSILON);
     }
 
     @Test
@@ -151,7 +152,7 @@ class MultiTickActionTest {
                 AgentId.of("agent-1"), "Atlas", SPOT, new Needs(0.0, 0.0, 50.0, 100.0));
         world.addAgent(agent);
         Simulation simulation = new Simulation(
-                world, new FixedDecisionMaker(new dev.evoworld.core.action.RestAction(6.0)), CONFIG);
+                world, new FixedDecisionMaker(new dev.evoworld.core.action.RestAction()), CONFIG);
         Recorder recorder = new Recorder();
         simulation.addObserver(recorder);
 

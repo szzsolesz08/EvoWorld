@@ -78,7 +78,7 @@ public final class ActionScripts {
             }
 
             script.add(new EatAction(ResourceType.BERRIES, MEAL));
-            script.add(new RestAction(config.actions().restEnergyGain()));
+            script.add(new RestAction());
         }
         return List.copyOf(script);
     }

@@ -39,9 +39,13 @@ public record ActionCandidate(
         int stepsAway,
         double expectedEnergyCost,
         String rationale,
-        Optional<Location> target) {
+        Optional<Location> target,
+        int workAtTarget) {
 
     public ActionCandidate {
+        if (workAtTarget < 0) {
+            throw new IllegalArgumentException("work must not be negative, was " + workAtTarget);
+        }
         Objects.requireNonNull(action, "action");
         Objects.requireNonNull(target, "target");
         Objects.requireNonNull(goalName, "goalName");
@@ -67,7 +71,21 @@ public record ActionCandidate(
             double expectedEnergyCost,
             String rationale) {
         this(action, goalName, expectedBenefit, confidence, stepsAway, expectedEnergyCost,
-                rationale, Optional.empty());
+                rationale, Optional.empty(), 0);
+    }
+
+    /** A candidate heading somewhere, with nothing more to do once there than the action says. */
+    public ActionCandidate(
+            Action action,
+            String goalName,
+            double expectedBenefit,
+            double confidence,
+            int stepsAway,
+            double expectedEnergyCost,
+            String rationale,
+            Optional<Location> target) {
+        this(action, goalName, expectedBenefit, confidence, stepsAway, expectedEnergyCost,
+                rationale, target, 0);
     }
 
     /** A candidate that heads for {@code target}. */
@@ -80,8 +98,27 @@ public record ActionCandidate(
             int stepsAway,
             double expectedEnergyCost,
             String rationale) {
+        return heading(target, action, goalName, expectedBenefit, confidence, stepsAway,
+                expectedEnergyCost, rationale, 0);
+    }
+
+    /**
+     * A candidate that heads for {@code target}, where the benefit takes
+     * {@code workAtTarget} more ticks once there - a bush has to be picked
+     * before it feeds anyone.
+     */
+    public static ActionCandidate heading(
+            Location target,
+            Action action,
+            String goalName,
+            double expectedBenefit,
+            double confidence,
+            int stepsAway,
+            double expectedEnergyCost,
+            String rationale,
+            int workAtTarget) {
         return new ActionCandidate(action, goalName, expectedBenefit, confidence, stepsAway,
-                expectedEnergyCost, rationale, Optional.of(target));
+                expectedEnergyCost, rationale, Optional.of(target), workAtTarget);
     }
 
     /** Whether this carries on {@code intent}: the same goal, towards the same place. */
@@ -104,7 +141,8 @@ public record ActionCandidate(
      * itself. What makes a close mediocre option beat a distant perfect one.
      */
     public int ticksToBenefit() {
-        return stepsAway + action.durationTicks();
+        int walking = (stepsAway + action.stepsPerTick() - 1) / action.stepsPerTick();
+        return walking + action.ticksUntilBenefit() + workAtTarget;
     }
 
     private static void requireFraction(double value, String what) {

@@ -164,14 +164,27 @@ class MotivationSystemTest {
         }
 
         @Test
-        @DisplayName("urgency accelerates: the second half of a need matters far more")
+        @DisplayName("urgency accelerates: the second half of a need matters more than the first")
         void urgencyAccelerates() {
             double firstHalf = priorityOf(SatisfyThirstGoal.NAME, needs(0, 50, 100));
             double secondHalf = priorityOf(SatisfyThirstGoal.NAME, needs(0, 100, 100)) - firstHalf;
 
+            // The appetite makes the first half count for something - a mild
+            // thirst is worth a drink - but the urgency still dominates the end.
             assertTrue(
-                    secondHalf > firstHalf * 2,
-                    "going from half to fully thirsty should matter much more than the first half");
+                    secondHalf > firstHalf,
+                    "going from half to fully thirsty should matter more than the first half");
+        }
+
+        @Test
+        @DisplayName("a mild need is wanted a little: appetite comes long before danger")
+        void appetiteComesEarly() {
+            double mildThirst = priorityOf(SatisfyThirstGoal.NAME, needs(0, 20, 100));
+            double mildHunger = priorityOf(SatisfyHungerGoal.NAME, needs(20, 0, 100));
+
+            assertTrue(mildThirst > 0.05, "thirst at 20 should be felt: " + mildThirst);
+            assertTrue(mildHunger > 0.1, "hunger at 20 should be felt: " + mildHunger);
+            assertEquals(1.0, priorityOf(SatisfyHungerGoal.NAME, needs(100, 0, 100)), EPSILON);
         }
     }
 
@@ -212,11 +225,18 @@ class MotivationSystemTest {
 
         @Test
         @DisplayName("the crossover is where the curves meet, not where a rule puts it")
-        void curiosityIsOvertakenAtTheSquareRootOfItself() {
-            // Thirst t^2 meets curiosity c(1 - t^2) where t^2 = c / (1 + c): the
-            // point is set by the curves, not by a threshold anyone wrote.
+        void curiosityIsOvertakenWhereTheCurvesMeet() {
+            // Thirst a*t + (1-a)*t^2 (appetite share a, appetite spread over the
+            // whole bar) meets curiosity c*(1 - t^2) at the positive root of
+            // (1 - a + c) t^2 + a t - c = 0: the point is set by the curves,
+            // not by a threshold anyone wrote.
             double c = ExploreGoal.DEFAULT_CURIOSITY;
-            double crossover = Math.sqrt(c / (1.0 + c)) * Needs.MAX;
+            double a = Appetite.APPETITE_SHARE;
+            double quadratic = 1.0 - a + c;
+            double root = (-a + Math.sqrt(a * a + 4.0 * quadratic * c)) / (2.0 * quadratic);
+            assertEquals(Needs.MAX, SatisfyThirstGoal.COMFORTABLE_UP_TO, EPSILON,
+                    "the closed form assumes thirst's appetite spans the whole bar");
+            double crossover = root * Needs.MAX;
 
             assertEquals(
                     ExploreGoal.NAME, assess(needs(0, crossover - 1, 100)).dominant().name());
@@ -248,9 +268,9 @@ class MotivationSystemTest {
         @Test
         @DisplayName("equal wants fall back on registration order, so survival beats comfort")
         void tiesResolveByRegistrationOrder() {
-            // Identical hunger and thirst give identical priorities, both high
-            // enough to have overtaken curiosity.
-            Motivation motivation = assess(needs(80, 80, 100));
+            // At the top of both bars both wants are total, so they tie, and
+            // the tie goes to the goal registered first.
+            Motivation motivation = assess(needs(100, 100, 100));
 
             assertEquals(
                     motivation.priorityOf(SatisfyHungerGoal.NAME),
@@ -327,7 +347,7 @@ class MotivationSystemTest {
         void readsClearlyInALog() {
             String rendered = assess(needs(0, 90, 100)).toString();
 
-            assertTrue(rendered.startsWith("wants SATISFY_THIRST 0.81 (thirst at 90.0)"), rendered);
+            assertTrue(rendered.startsWith("wants SATISFY_THIRST 0.85 (thirst at 90.0)"), rendered);
         }
 
         @Test

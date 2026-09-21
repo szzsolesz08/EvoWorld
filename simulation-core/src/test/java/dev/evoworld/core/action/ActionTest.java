@@ -44,6 +44,29 @@ class ActionTest {
     class Move {
 
         @Test
+        @DisplayName("at longer ticks one move covers several tiles, paying for each")
+        void severalStepsInATick() {
+            Agent agent = agentAt(new Location(0, 4), new Needs(0.0, 0.0, 80.0, 100.0));
+
+            ActionOutcome outcome = new MoveAction(new Location(7, 4), 1.0, 3).execute(agent, world());
+
+            assertTrue(outcome.succeeded());
+            assertEquals(new Location(3, 4), agent.location());
+            assertEquals(77.0, agent.needs().energy(), EPSILON);
+        }
+
+        @Test
+        @DisplayName("and stops at the destination rather than walking past it")
+        void stopsWhereItWasGoing() {
+            Agent agent = agentAt(new Location(0, 4), new Needs(0.0, 0.0, 80.0, 100.0));
+
+            new MoveAction(new Location(2, 4), 1.0, 6).execute(agent, world());
+
+            assertEquals(new Location(2, 4), agent.location());
+            assertEquals(78.0, agent.needs().energy(), EPSILON);
+        }
+
+        @Test
         @DisplayName("steps one tile towards the destination and spends energy")
         void movesAndSpendsEnergy() {
             Agent agent = hungryAndThirsty();
@@ -119,18 +142,49 @@ class ActionTest {
     // --- REST -------------------------------------------------------------
 
     @Nested
+    @DisplayName("Sleep")
+    class Sleep {
+
+        @Test
+        @DisplayName("lasts as long as it was asked to, and counts from its first tick")
+        void lastsAndCountsAtOnce() {
+            SleepAction sleep = new SleepAction(45);
+
+            assertEquals(45, sleep.durationTicks());
+            assertEquals(1, sleep.ticksUntilBenefit());
+            assertEquals(ActivityLevel.SLEEPING, sleep.exertion().level());
+            assertEquals(1.0, sleep.exertion().comfort());
+        }
+
+        @Test
+        @DisplayName("a bed is a sleep with more comfort")
+        void carriesItsComfort() {
+            assertEquals(1.5, new SleepAction(45, 1.5).exertion().comfort());
+        }
+
+        @Test
+        @DisplayName("is never refused: whether to sleep is the mind's question, not the world's")
+        void neverRefused() {
+            Agent rested = agentAt(MIDDLE, Needs.healthy());
+
+            assertTrue(new SleepAction(6).execute(rested, world()).succeeded());
+        }
+    }
+
+    @Nested
     @DisplayName("Rest")
     class Rest {
 
         @Test
-        void recoversEnergy() {
+        @DisplayName("a breather changes nothing by itself: the body does the recovering, tick by tick")
+        void restIsABreather() {
             Agent agent = agentAt(MIDDLE, new Needs(0.0, 0.0, 50.0, 100.0));
 
-            ActionOutcome outcome = new RestAction(6.0).execute(agent, world());
+            ActionOutcome outcome = new RestAction().execute(agent, world());
 
             assertTrue(outcome.succeeded());
-            assertEquals(56.0, agent.needs().energy(), EPSILON);
-            assertEquals(6.0, outcome.change().energyChange(), EPSILON);
+            assertTrue(outcome.change().isNothing(), "the metabolism charges a rest, the action does not");
+            assertEquals(ActivityLevel.RESTING, new RestAction().activityLevel());
         }
 
         @Test
@@ -138,7 +192,7 @@ class ActionTest {
         void blockedWhenFullyRested() {
             Agent agent = agentAt(MIDDLE, Needs.healthy());
 
-            ActionOutcome outcome = new RestAction(6.0).execute(agent, world());
+            ActionOutcome outcome = new RestAction().execute(agent, world());
 
             assertTrue(outcome.wasBlocked());
             assertTrue(outcome.change().isNothing());
@@ -149,7 +203,7 @@ class ActionTest {
         void allowedWhenHurtButRested() {
             Agent agent = agentAt(MIDDLE, new Needs(0.0, 0.0, 100.0, 60.0));
 
-            ActionOutcome outcome = new RestAction(6.0).execute(agent, world());
+            ActionOutcome outcome = new RestAction().execute(agent, world());
 
             assertTrue(outcome.succeeded());
         }
@@ -157,7 +211,7 @@ class ActionTest {
         @Test
         @DisplayName("resting is the one action that is not work")
         void restingIsNotWork() {
-            assertEquals(ActivityLevel.RESTING, new RestAction(6.0).activityLevel());
+            assertEquals(ActivityLevel.RESTING, new RestAction().activityLevel());
         }
     }
 
@@ -481,7 +535,7 @@ class ActionTest {
 
             for (Action action : java.util.List.of(
                     new MoveAction(MIDDLE, 1.5),
-                    new RestAction(6.0),
+                    new RestAction(),
                     new GatherAction(ResourceType.BERRIES, 5.0, 1.0),
                     new EatAction(ResourceType.BERRIES, 4.0),
                     new DrinkAction(ResourceType.WATER, 4.0))) {
@@ -534,7 +588,7 @@ class ActionTest {
         @DisplayName("actions with the same parameters are the same action")
         void actionsHaveValueEquality() {
             assertEquals(new MoveAction(MIDDLE, 1.5), new MoveAction(MIDDLE, 1.5));
-            assertEquals(new RestAction(6.0), new RestAction(6.0));
+            assertEquals(new RestAction(), new RestAction());
             assertEquals(new GatherAction(ResourceType.BERRIES, 5.0, 1.0), new GatherAction(ResourceType.BERRIES, 5.0, 1.0));
             assertEquals(
                     new EatAction(ResourceType.BERRIES, 4.0),
@@ -547,7 +601,8 @@ class ActionTest {
         @DisplayName("nonsensical actions are rejected at construction")
         void rejectsImpossibleActions() {
             assertThrows(IllegalArgumentException.class, () -> new MoveAction(MIDDLE, -1.0));
-            assertThrows(IllegalArgumentException.class, () -> new RestAction(-1.0));
+            assertThrows(IllegalArgumentException.class, () -> new SleepAction(0));
+            assertThrows(IllegalArgumentException.class, () -> new SleepAction(10, 0.0));
             assertThrows(IllegalArgumentException.class, () -> new GatherAction(ResourceType.BERRIES, 0.0, 1.0));
             assertThrows(
                     IllegalArgumentException.class, () -> new EatAction(ResourceType.BERRIES, 0.0));

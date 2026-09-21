@@ -1,17 +1,21 @@
 package dev.evoworld.core.goal;
 
-import dev.evoworld.core.agent.Needs;
 import dev.evoworld.core.perception.Perception;
 import java.util.Locale;
 
 /**
  * The want that grows as hunger does.
  *
- * <p>The same curve as thirst, which is what makes the two comparable. Thirst
- * still wins over a long run, but because the body dehydrates faster than it
- * starves rather than because this layer says so.
+ * <p>The same {@link Appetite} as thirst, which is what makes the two
+ * comparable: peckish a few hours after a meal, and single-minded when
+ * starving. Appetite is full at {@link #COMFORTABLE_UP_TO}, about three days
+ * after a meal. Thirst still wins over a long run, because the body dries out
+ * faster than it starves, not because this layer says so.
  */
 public final class SatisfyHungerGoal extends Goal {
+
+    /** The hunger at which appetite has fully arrived and only urgency still grows. */
+    public static final double COMFORTABLE_UP_TO = 50.0;
 
     public static final String NAME = "SATISFY_HUNGER";
 
@@ -22,8 +26,7 @@ public final class SatisfyHungerGoal extends Goal {
 
     @Override
     protected double computePriority(Perception perception) {
-        double pressure = perception.needs().hunger() / Needs.MAX;
-        return pressure * pressure;
+        return Appetite.want(perception.needs().hunger(), COMFORTABLE_UP_TO);
     }
 
     @Override

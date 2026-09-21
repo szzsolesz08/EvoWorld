@@ -7,26 +7,24 @@ does, and carries on for weeks of simulated time without anyone touching anythin
 
 ```
 [day 1 00:10] Atlas discovered first ever sight of water at (3,8)
-[day 1 19:50] Atlas learned wood nourishment: 0.0 hunger per unit (0.25 sure after 1)
-[day 1 19:50] Atlas is starving, and it is starting to hurt (health 98.5)
-[day 1 21:10] Atlas learned berries nourishment: 8.0 hunger per unit (0.25 sure after 1)
-[day 1 21:20] Atlas is no longer starving (health 86.5)
-[day 2 01:40] Atlas has fully recovered (health 100.0)
+[day 1 22:20] Atlas learned water hydration: 12.0 thirst per unit (0.25 sure after 1)
+[day 2 01:50] Atlas's move skill is now skilled
+[day 2 04:20] Atlas learned wood nourishment: 0.0 hunger per unit (0.25 sure after 1)
+[day 2 05:30] Atlas learned berries nourishment: 8.0 hunger per unit (0.25 sure after 1)
 
--- day 3 00:00 -- Atlas ------------------------------------------------
-   status     alive, age 2d 0h, health 100.0
-   location   (6,5)
-   needs      hunger 11.2, thirst 28.8, energy 81.2
-   carrying   berries 3.0
-   wants      satisfy thirst (0.08)
-   last act   MOVE to (3,8), for satisfy thirst (recalls water 7 steps south-west, 11 ticks ago)
-   intent     heading for (3,8) to satisfy thirst, 6 steps to go, set out 4 ticks ago
-   remembers  found wood at (7,3); close call with hunger at (1,5); berries at (4,3);
-              berries at (10,5); found berries at (4,3)
-   knows      berries: not a drink, food, 8.0 a unit (73%);
-              water: not food, drink, 12.0 a unit (63%); stone: not food, not a drink;
-              wood: not food, not a drink
-   skills     move skilled (46% less effort), gather competent (28% less effort)
+-- day 6 00:00 -- Atlas ------------------------------------------------
+   status     alive, age 5d 0h, health 100.0
+   location   (7,8)
+   needs      hunger 7.0, thirst 7.3, energy 53.2
+   carrying   berries 13.5
+   wants      recover energy (0.56)
+   doing      sleeping, 4h 40m left
+   intent     heading for (10,10) to explore, 5 steps to go, set out 20 ticks ago
+   remembers  berries at (8,8); found berries at (8,8); water at (3,8); berries at (10,5);
+              found water at (3,8)
+   knows      berries: not a drink, food, 8.0 a unit (79%);
+              water: drink, 12.0 a unit (86%), not food; wood: not a drink, not food
+   skills     move skilled (49% less effort), gather apprentice (21% less effort)
    explored   16 of 16 regions
 ```
 
@@ -61,8 +59,8 @@ and the full pipeline from perception to learning, running unattended and reprod
 | --- | --- |
 | World | a seeded 16×16 world; berries, water, wood and stone; resources that regrow at their own rates (stone never does) |
 | Time | discrete ticks of configurable simulated length (default 10 minutes); days and hours in all output |
-| Body | hunger, thirst, energy and health; activity-dependent energy use; unmet needs that do damage; healing when looked after, faster at rest |
-| Actions | move, gather, eat, drink, rest, discard; explicit preconditions, structured outcomes, multi-tick work |
+| Body | hunger, thirst, energy and health at realistic hourly rates; energy spent awake and restored asleep; unmet needs that do damage; healing when looked after, fastest asleep |
+| Actions | move, gather, eat, drink, rest, sleep, discard; explicit preconditions, structured outcomes, multi-tick work |
 | Perception | a six-step field of view; nothing beyond it is known except by memory |
 | Goals | four wants (thirst, hunger, energy, curiosity) scored from the body, never from a rule |
 | Decisions | propose, evaluate, select: six-factor utility, no if/else behaviour anywhere |
@@ -109,7 +107,7 @@ Four properties the design protects, each enforced by tests rather than by conve
 - **Everything is explainable.** Every decision carries its reasons, every memory its
   timestamp and confidence, every belief the count behind it.
 
-The reasoning behind each significant decision is recorded in [docs/adr](docs/adr), 32
+The reasoning behind each significant decision is recorded in [docs/adr](docs/adr), 33
 records in all. They include the ones where a first attempt was wrong.
 
 ## The simulation loop
@@ -167,24 +165,61 @@ Five goals each score themselves from the agent's state. A goal says **what**, n
 
 | Goal | Priority |
 | --- | --- |
-| satisfy thirst | `(thirst / 100)²` |
-| satisfy hunger | `(hunger / 100)²` |
+| satisfy thirst | `0.4 × thirst/100 + 0.6 × (thirst / 100)²` |
+| satisfy hunger | `0.4 × min(1, hunger/50) + 0.6 × (hunger / 100)²` |
 | recover energy | `(1 − energy / 100)²` |
 | recover health | `(1 − health / 100)²` |
 | explore | `0.6 × energy × unexplored fraction × (1 − most pressing need²)` |
 
-Needs accelerate: mild thirst is a murmur, severe thirst drowns everything else.
+Hunger and thirst are an **appetite** and an **urgency** at once. The appetite comes
+early and levels off: a few hours after a meal he is peckish and eats if food is at hand.
+The urgency is nothing at first and everything at the end, so severe thirst drowns out
+everything else. Below 5, a need is not felt at all: nobody walks to a spring for a
+thirst they cannot notice.
 Curiosity is what is left once survival has had its say, so a comfortable agent explores
 and a dying one does not. Injury does *not* quiet curiosity. Exploring is how a newborn
 finds food, and when injury was counted against curiosity, three wounded newborns in
 twenty starved.
 
-**Healing** is metabolism, not an action. Each tick a body that is looked after (hunger
-and thirst at most 50, energy at least 25) regains 0.2 health, or 2.0 if it spent the
-tick resting. Those conditions are far from anything that does damage, so no tick both
-hurts and heals. Most recovery happens on its own, during rests taken for energy. The
-health goal is a tie-break: when nothing else presses, a badly hurt agent rests rather
-than wanders.
+### A body in real time
+
+Every rate that changes a body or the world is stated **per simulated hour** and turned
+into ticks once, so an hour is an hour at any tick length. So are walking speed (six tiles
+an hour, a tile being ten minutes' walk) and the time a gather takes (20 minutes).
+
+| | Per hour | What it means |
+| --- | --- | --- |
+| thirst | +2.0 | hurts after about two days without water; a gulp covers about six hours |
+| hunger | +0.7 | hurts after about five and a half days without food; a portion covers about eleven hours |
+| energy, awake | −5, or −1.5 sitting still | about fifteen hours from rested to sleepy |
+| energy, asleep | +10 | about seven and a half hours from sleepy to rested |
+| damage when starving, parched or spent | 0.6 / 4 / 2 | about a week, a day, two days to die |
+| healing when well: active, resting, asleep | 0.25 / 1 / 2 | sleep is where a body mends |
+
+**Sleep** is its own action: a long block, sized when he lies down to bring energy back to
+full, never longer than ten hours, and cut short if hunger or thirst would start hurting
+before he woke. He is only sleepy below 25 energy, so he stays up until the day is spent
+and then sleeps once, rather than napping. A badly hurt agent (health 50 or less) lies
+down to mend whatever its energy. Resting only slows the drain.
+
+The body recovers through the **metabolism**, tick by tick, according to what the tick was
+spent doing and how comfortably. Comfort is 1 on bare ground; it multiplies what comes
+back, never what anything costs. That is the hook for equipment: a bed will be a sleep
+with more comfort, and nothing else has to change for one to exist.
+
+**Healing** is part of the same metabolism. A body that is looked after (hunger and thirst
+at most 50, energy at least 25) mends, fastest asleep. Those conditions are far from
+anything that does damage, so no tick both hurts and heals.
+
+The result, over 20 seeds and 20 days each, from [docs/survey.md](docs/survey.md):
+
+| | A day |
+| --- | --- |
+| sleep | 8.8 hours, about one night |
+| meals | 2.6 |
+| drinks | 5.1 |
+| walking for water | about 3.6 hours: water cannot be carried yet |
+| free for exploring | about 10 hours |
 
 ### Deciding: propose, evaluate, select
 
@@ -450,13 +485,13 @@ the change did.
 ## Testing
 
 ```bash
-./gradlew test     # all modules, 559 tests
+./gradlew test     # all modules, 604 tests
 ./gradlew build    # compile, test and assemble
 ```
 
 | Module | Tests | What they cover |
 | --- | --- | --- |
-| core | 468 | every rule, action, goal, proposer and learner; memory, knowledge, exploration, skills; intent and commitment; healing; long-run integration; save and continue |
+| core | 513 | every rule, action, goal, proposer and learner; memory, knowledge, exploration, skills; intent and commitment; healing; sleep and the daily rhythm; per-hour rates; long-run integration; save and continue |
 | persistence | 14 | JSON round trips, save-to-file-and-continue, byte stability, strict reading, atomic writes |
 | runner | 60 | options, status report, log levels, autosave, pacing, scripted runs; the survey's scenarios, measurements and determinism |
 | viewer | 17 | pacing, pausing and stepping, the feed, screen layout, options; a watched run is the same run as an unwatched one |
@@ -473,14 +508,16 @@ The integration tests worth knowing about:
   values and improves, and that it never repeats a lesson it has been taught. It fails
   any run where the agent walks back and forth between two places, and it holds seed 10,
   the MVP's one death, to a full 2,000 hourly ticks. Agents that start at health 30 must
-  mend and live on, the default run's day-1 injury must be healed within three days, and
-  health may only rise on a tick when the body is well looked after.
+  mend and live on, a newborn must learn what food is without ever being hurt, and health
+  may only rise on a tick when the body is well looked after. Every seed must live a
+  realistic day: one night's sleep of 7 to 10 hours, a few meals and drinks, no danger.
+  The same day must come out within 25% at 10- and 30-minute ticks.
 - **`DitheringTest`** sets up the scene seed 10 died in, two bushes with one just out
   of sight, and requires every step to bring the agent closer to the bush it chooses. It
   also tests each of the two faults behind the old oscillation on its own. The MVP fails
   all three tests.
 - **`SaveAndContinueTest`** and **`SaveFileTest`** save at nine points, including mid-job,
-  mid-journey and mid-recovery,
+  mid-journey, mid-recovery and mid-sleep,
   through memory and through real JSON files, and require the continuation to be
   identical to a run that never stopped. That includes a ten-leg relay of save and
   reload.
@@ -493,13 +530,19 @@ HTML reports are written to `<module>/build/reports/tests/test/index.html`.
 
 Honest ones, most important first.
 
-- **The first day is the dangerous one.** A newborn agent does not know berries are food
-  until it tries them, and in the default run it goes hungry enough to lose some health
-  before it does. It heals within a few hours. Once it has learned, it stays out of
-  danger: across 20 seeds × 2,000 hourly ticks, no need does any damage at all.
-- **Healing is free.** Mending costs no extra food or water, and a hurt agent rarely
-  chooses to stop and rest for it. Recovery is the body's doing, not a decision the agent
-  weighs.
+- **Water has to be walked to.** Food can be carried, water cannot, so Atlas spends about
+  3.6 hours a day walking to springs. That is the slot a water bottle will reclaim.
+  Until there is work competing for his day, a walk to water when a little thirsty is
+  simply the best use of idle time, so the survey's free time (41%) understates how free
+  he is.
+- **No day and night.** He sleeps when he is tired, which drifts around the clock.
+- **Short actions round up to a tick.** A meal or a drink takes one tick, so at hour-long
+  ticks it takes an hour. Rates, walking and gathering are exact at any tick length; the
+  default ten-minute tick is where a day looks right.
+- **Healing is free.** Mending costs no extra food or water.
+- **Cognitive horizons are still in ticks:** how fast memories and familiarity fade, and how
+  far ahead an agent discounts. They do not move the bars, but they do stretch at longer
+  ticks.
 - **Greedy, one step at a time.** The agent scores the next action, never a sequence.
   Standing in a spring while mildly thirsty, it walks away rather than topping up, because
   nothing models "this saves a walk later".
@@ -515,7 +558,7 @@ Honest ones, most important first.
 - **Hydration is read against the gulp asked for, not the gulp received**, so a spring
   with less than a gulp left would read low. Springs refill fast enough that it has not
   shown up in practice.
-- **Save format version 3 has no migration path.** A save from a different format version
+- **Save format version 4 has no migration path.** A save from a different format version
   is refused rather than converted. Scripted runs cannot be saved at all.
 - **After loading, the status block shows "(not decided yet)"** until the agent's next
   decision. The latest want and decision exist only for display and are not saved.

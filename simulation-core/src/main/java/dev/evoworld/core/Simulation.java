@@ -5,6 +5,8 @@ import dev.evoworld.core.action.ActionOutcome;
 import dev.evoworld.core.agent.ActivityLevel;
 import dev.evoworld.core.agent.Agent;
 import dev.evoworld.core.agent.AgentId;
+import dev.evoworld.core.agent.Exertion;
+import dev.evoworld.core.agent.MetabolismRates;
 import dev.evoworld.core.agent.Needs;
 import dev.evoworld.core.decision.Decision;
 import dev.evoworld.core.decision.DecisionMaker;
@@ -104,7 +106,7 @@ public final class Simulation {
     private final Map<AgentId, ActionInProgress> underway = new LinkedHashMap<>();
 
     /** How hard each agent worked last tick, which is what the tick cost it. */
-    private final Map<AgentId, ActivityLevel> lastActivity = new LinkedHashMap<>();
+    private final Map<AgentId, Exertion> lastActivity = new LinkedHashMap<>();
 
     /** Which of its needs are currently doing an agent damage. */
     private final Map<AgentId, Set<Danger>> dangers = new LinkedHashMap<>();
@@ -118,6 +120,9 @@ public final class Simulation {
     private final Map<AgentId, Decision> lastDecision = new LinkedHashMap<>();
 
     private boolean announced;
+
+    /** The configured body, per hour, converted once to what one tick does to it. */
+    private final MetabolismRates bodyPerTick;
 
     /** Whether {@link #start()} has been called; not saved, it only guards the call. */
     private boolean steppingStarted;
@@ -150,6 +155,7 @@ public final class Simulation {
         this.senses = new PerceptionSystem(config.perceptionRadius());
         this.motivations = MotivationSystem.standard();
         this.ticksPerDay = Math.max(1L, Duration.ofDays(1).dividedBy(config.tickDuration()));
+        this.bodyPerTick = config.metabolism().perTick(config.tickDuration());
     }
 
     public void addObserver(SimulationObserver observer) {
@@ -295,7 +301,7 @@ public final class Simulation {
                     agent,
                     current == null ? null : current.action(),
                     current == null ? 0L : current.ticksRemaining(),
-                    lastActivity.getOrDefault(agent.id(), ActivityLevel.RESTING),
+                    lastActivity.getOrDefault(agent.id(), Exertion.of(ActivityLevel.RESTING)),
                     List.copyOf(dangers.getOrDefault(agent.id(), EnumSet.noneOf(Danger.class)))));
         }
         return new SavedSimulation(
@@ -351,7 +357,7 @@ public final class Simulation {
                         new ActionInProgress(
                                 SaveFormat.load(agent.underway()), agent.underwayTicksRemaining()));
             }
-            simulation.lastActivity.put(id, agent.lastActivity());
+            simulation.lastActivity.put(id, new Exertion(agent.lastActivity(), agent.lastComfort()));
             Set<Danger> active = EnumSet.noneOf(Danger.class);
             active.addAll(agent.dangers());
             simulation.dangers.put(id, active);
@@ -368,7 +374,7 @@ public final class Simulation {
         notifyAll(observer -> observer.onTickStarted(now.tick()));
 
         // 2. update the environment
-        world.regenerateResources();
+        world.regenerateResources(config.tickDuration());
 
         for (Agent agent : world.agents()) {
             if (!agent.isAlive()) {
@@ -401,8 +407,8 @@ public final class Simulation {
      */
     private void liveThroughTheTick(Agent agent, SimulationTime now) {
         Needs before = agent.needs();
-        ActivityLevel effort = lastActivity.getOrDefault(agent.id(), ActivityLevel.RESTING);
-        agent.live(config.metabolism(), effort);
+        Exertion effort = lastActivity.getOrDefault(agent.id(), Exertion.of(ActivityLevel.RESTING));
+        agent.live(bodyPerTick, effort);
         double healthLost = before.health() - agent.needs().health();
         MemoryRecorder.rememberHarm(
                 agent.memory(), agent.location(), now, agent.needs(), healthLost);
@@ -433,7 +439,7 @@ public final class Simulation {
         }
 
         Action action = current.action();
-        lastActivity.put(agent.id(), action.activityLevel());
+        lastActivity.put(agent.id(), action.exertion());
         current = current.afterATick();
         if (!current.isFinished()) {
             underway.put(agent.id(), current);

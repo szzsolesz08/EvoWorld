@@ -28,6 +28,13 @@ import java.util.TreeMap;
  * @param foodTripsToNothing those whose target had nothing left when the trip
  *     ended - reached, or given up once the agent could see it was bare
  * @param refusals actions the world refused, by action name
+ * @param hoursLived simulated hours the run covered
+ * @param sleepHours simulated hours spent asleep
+ * @param sleeps how many times it lay down to sleep
+ * @param meals successful meals
+ * @param drinks successful drinks
+ * @param upkeepHours simulated hours spent looking after itself: sleeping,
+ *     resting, eating, drinking, and gathering or walking for food and water
  */
 public record SeedResult(
         long seed,
@@ -47,12 +54,27 @@ public record SeedResult(
         int foodTrips,
         int foodTripsAbandoned,
         int foodTripsToNothing,
-        Map<String, Integer> refusals) {
+        Map<String, Integer> refusals,
+        double hoursLived,
+        double sleepHours,
+        int sleeps,
+        int meals,
+        int drinks,
+        double upkeepHours) {
 
     public SeedResult {
         Objects.requireNonNull(death, "death");
         Objects.requireNonNull(ticksToFullHealth, "ticksToFullHealth");
         refusals = new TreeMap<>(refusals);
+    }
+
+    public double days() {
+        return hoursLived / 24.0;
+    }
+
+    /** The share of the day left over once the body is looked after. */
+    public double freeShare() {
+        return hoursLived <= 0.0 ? 0.0 : Math.max(0.0, 1.0 - upkeepHours / hoursLived);
     }
 
     public int totalRefusals() {

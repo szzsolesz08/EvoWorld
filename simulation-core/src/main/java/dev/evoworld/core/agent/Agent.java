@@ -259,13 +259,13 @@ public final class Agent {
      * <p>A dead agent does not age further, so {@link #ticksAlive()} stays the
      * length of the life rather than the length of the run.
      */
-    public void live(MetabolismRates rates, ActivityLevel activity) {
+    public void live(MetabolismRates rates, Exertion exertion) {
         Objects.requireNonNull(rates, "rates");
-        Objects.requireNonNull(activity, "activity");
+        Objects.requireNonNull(exertion, "exertion");
         if (!isAlive()) {
             return;
         }
-        this.needs = needs.afterTick(rates, activity);
+        this.needs = needs.afterTick(rates, exertion);
         this.ticksAlive++;
     }
 

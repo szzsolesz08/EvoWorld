@@ -36,8 +36,15 @@ public final class ExploreProposer implements ActionProposer {
 
     private final double moveEnergyCost;
 
+    private final int stepsPerTick;
+
     public ExploreProposer(double moveEnergyCost) {
+        this(moveEnergyCost, 1);
+    }
+
+    public ExploreProposer(double moveEnergyCost, int stepsPerTick) {
         this.moveEnergyCost = moveEnergyCost;
+        this.stepsPerTick = stepsPerTick;
     }
 
     @Override
@@ -76,7 +83,7 @@ public final class ExploreProposer implements ActionProposer {
     private ActionCandidate head(Location target, int steps, double novelty, String why) {
         return ActionCandidate.heading(
                 target,
-                new MoveAction(target, moveEnergyCost),
+                new MoveAction(target, moveEnergyCost, stepsPerTick),
                 ExploreGoal.NAME,
                 novelty,
                 SPECULATIVE,

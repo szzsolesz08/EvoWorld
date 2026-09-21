@@ -1,5 +1,8 @@
 package dev.evoworld.core.resource;
 
+import dev.evoworld.core.Rates;
+import java.time.Duration;
+
 /**
  * What a resource is, and how it behaves over time.
  *
@@ -9,8 +12,9 @@ package dev.evoworld.core.resource;
  * them, which nothing does yet.
  *
  * <p>Regeneration is what separates a resource you can live off from one you
- * can only use up. Berries regrow within a day, wood takes the better part of a
- * week, water replenishes almost immediately, and stone never comes back.
+ * can only use up. It is stated per simulated hour: berries regrow within a
+ * day, wood takes the better part of a week, water replenishes almost
+ * immediately, and stone never comes back.
  *
  * <p>Nourishment and hydration are what one unit does for a body. A resource
  * with neither is a material rather than a meal, which is how an action decides
@@ -18,27 +22,27 @@ package dev.evoworld.core.resource;
  */
 public enum ResourceType {
 
-    //       label      capacity  regen  nourishment  hydration
-    BERRIES("berries",      12.0,  0.25,         8.0,       0.0),
-    WATER("water",         100.0,  5.00,         0.0,      12.0),
-    WOOD("wood",            20.0,  0.05,         0.0,       0.0),
-    STONE("stone",          30.0,  0.00,         0.0,       0.0);
+    //       label      capacity  regen/h  nourishment  hydration
+    BERRIES("berries",      12.0,    1.5,          8.0,       0.0),
+    WATER("water",         100.0,   30.0,          0.0,      12.0),
+    WOOD("wood",            20.0,    0.3,          0.0,       0.0),
+    STONE("stone",          30.0,    0.0,          0.0,       0.0);
 
     private final String label;
     private final double capacity;
-    private final double regenPerTick;
+    private final double regenPerHour;
     private final double nourishmentPerUnit;
     private final double hydrationPerUnit;
 
     ResourceType(
             String label,
             double capacity,
-            double regenPerTick,
+            double regenPerHour,
             double nourishmentPerUnit,
             double hydrationPerUnit) {
         this.label = label;
         this.capacity = capacity;
-        this.regenPerTick = regenPerTick;
+        this.regenPerHour = regenPerHour;
         this.nourishmentPerUnit = nourishmentPerUnit;
         this.hydrationPerUnit = hydrationPerUnit;
     }
@@ -52,14 +56,19 @@ public enum ResourceType {
         return capacity;
     }
 
-    /** How much a node recovers per tick; zero for types that never regrow. */
-    public double regenPerTick() {
-        return regenPerTick;
+    /** How much a node recovers per simulated hour; zero for types that never regrow. */
+    public double regenPerHour() {
+        return regenPerHour;
+    }
+
+    /** How much a node recovers in one tick of {@code tick}. */
+    public double regenPerTick(Duration tick) {
+        return Rates.perTick(regenPerHour, tick);
     }
 
     /** Whether nodes of this type come back after being harvested. */
     public boolean isRenewable() {
-        return regenPerTick > 0.0;
+        return regenPerHour > 0.0;
     }
 
     /** How much hunger one unit relieves. */
@@ -80,12 +89,12 @@ public enum ResourceType {
         return hydrationPerUnit > 0.0;
     }
 
-    /** How many ticks an empty node needs to reach full again, empty if never. */
-    public java.util.OptionalLong ticksToFullFromEmpty() {
+    /** How many ticks of {@code tick} an empty node needs to reach full again; empty if never. */
+    public java.util.OptionalLong ticksToFullFromEmpty(Duration tick) {
         if (!isRenewable()) {
             return java.util.OptionalLong.empty();
         }
-        return java.util.OptionalLong.of((long) Math.ceil(capacity / regenPerTick));
+        return java.util.OptionalLong.of((long) Math.ceil(capacity / regenPerTick(tick)));
     }
 
     @Override

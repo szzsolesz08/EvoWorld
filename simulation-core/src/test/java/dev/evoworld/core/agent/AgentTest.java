@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.evoworld.core.resource.ResourceType;
 import dev.evoworld.core.world.Location;
+import java.time.Duration;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -15,7 +16,7 @@ class AgentTest {
 
     private static final double EPSILON = 1e-9;
     private static final Location START = new Location(4, 4);
-    private final MetabolismRates rates = MetabolismRates.defaults();
+    private final MetabolismRates rates = MetabolismRates.defaults().perTick(Duration.ofMinutes(10));
 
     private Agent atlas() {
         return Agent.spawn("agent-1", "Atlas", START);
@@ -187,11 +188,11 @@ class AgentTest {
         void aTickAgesAndDrains() {
             Agent agent = atlas();
 
-            agent.live(rates, ActivityLevel.ACTIVE);
+            agent.live(rates, Exertion.of(ActivityLevel.ACTIVE));
 
             assertEquals(1L, agent.ticksAlive());
-            assertEquals(rates.hungerPerTick(), agent.needs().hunger(), EPSILON);
-            assertEquals(Needs.MAX - rates.activeEnergyPerTick(), agent.needs().energy(), EPSILON);
+            assertEquals(rates.hunger(), agent.needs().hunger(), EPSILON);
+            assertEquals(Needs.MAX - -rates.activeEnergy(), agent.needs().energy(), EPSILON);
         }
 
         @Test
@@ -200,7 +201,7 @@ class AgentTest {
             Agent agent = atlas();
 
             for (int i = 0; i < 25; i++) {
-                agent.live(rates, ActivityLevel.RESTING);
+                agent.live(rates, Exertion.of(ActivityLevel.RESTING));
             }
 
             assertEquals(25L, agent.ticksAlive());
@@ -212,8 +213,8 @@ class AgentTest {
             Agent active = atlas();
             Agent resting = atlas();
 
-            active.live(rates, ActivityLevel.ACTIVE);
-            resting.live(rates, ActivityLevel.RESTING);
+            active.live(rates, Exertion.of(ActivityLevel.ACTIVE));
+            resting.live(rates, Exertion.of(ActivityLevel.RESTING));
 
             assertTrue(resting.needs().energy() > active.needs().energy());
         }
@@ -225,7 +226,7 @@ class AgentTest {
 
             long ticks = 0;
             while (agent.isAlive() && ticks < 10_000) {
-                agent.live(rates, ActivityLevel.ACTIVE);
+                agent.live(rates, Exertion.of(ActivityLevel.ACTIVE));
                 ticks++;
             }
 
@@ -239,8 +240,8 @@ class AgentTest {
             Agent agent = new Agent(
                     AgentId.of("agent-1"), "Atlas", START, new Needs(0.0, 0.0, 50.0, 0.0));
 
-            agent.live(rates, ActivityLevel.ACTIVE);
-            agent.live(rates, ActivityLevel.ACTIVE);
+            agent.live(rates, Exertion.of(ActivityLevel.ACTIVE));
+            agent.live(rates, Exertion.of(ActivityLevel.ACTIVE));
 
             assertFalse(agent.isAlive());
             assertEquals(0L, agent.ticksAlive());
@@ -253,8 +254,8 @@ class AgentTest {
             Agent second = atlas();
 
             for (int i = 0; i < 50; i++) {
-                first.live(rates, ActivityLevel.ACTIVE);
-                second.live(rates, ActivityLevel.ACTIVE);
+                first.live(rates, Exertion.of(ActivityLevel.ACTIVE));
+                second.live(rates, Exertion.of(ActivityLevel.ACTIVE));
             }
 
             assertEquals(first.needs(), second.needs());
@@ -265,7 +266,7 @@ class AgentTest {
         void rejectsMissingRatesOrActivity() {
             Agent agent = atlas();
 
-            assertThrows(NullPointerException.class, () -> agent.live(null, ActivityLevel.ACTIVE));
+            assertThrows(NullPointerException.class, () -> agent.live(null, Exertion.of(ActivityLevel.ACTIVE)));
             assertThrows(NullPointerException.class, () -> agent.live(rates, null));
         }
     }

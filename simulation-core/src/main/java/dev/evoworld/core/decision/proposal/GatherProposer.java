@@ -27,10 +27,17 @@ public final class GatherProposer implements ActionProposer {
 
     private final double amount;
     private final double energyCost;
+    private final int ticks;
 
     public GatherProposer(double amount, double energyCost) {
+        this(amount, energyCost, 2);
+    }
+
+    /** @param ticks how long a gather takes at this run's tick length */
+    public GatherProposer(double amount, double energyCost, int ticks) {
         this.amount = amount;
         this.energyCost = energyCost;
+        this.ticks = ticks;
     }
 
     @Override
@@ -61,7 +68,7 @@ public final class GatherProposer implements ActionProposer {
         }
 
         return List.of(new ActionCandidate(
-                new GatherAction(node.type(), haul, energyCost),
+                new GatherAction(node.type(), haul, energyCost, ticks),
                 SatisfyHungerGoal.NAME,
                 ExpectedRelief.fromEating(
                         perception.knowledge(), perception.needs(), node.type(), wouldGet),

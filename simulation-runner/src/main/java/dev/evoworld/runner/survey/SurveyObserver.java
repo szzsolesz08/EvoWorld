@@ -1,13 +1,18 @@
 package dev.evoworld.runner.survey;
 
 import dev.evoworld.core.action.ActionOutcome;
+import dev.evoworld.core.action.DrinkAction;
+import dev.evoworld.core.action.EatAction;
 import dev.evoworld.core.action.RestAction;
+import dev.evoworld.core.action.SleepAction;
 import dev.evoworld.core.agent.AgentId;
 import dev.evoworld.core.agent.Needs;
 import dev.evoworld.core.decision.Decision;
 import dev.evoworld.core.event.SimulationEvent;
 import dev.evoworld.core.goal.ExploreGoal;
 import dev.evoworld.core.goal.RecoverHealthGoal;
+import dev.evoworld.core.goal.SatisfyHungerGoal;
+import dev.evoworld.core.goal.SatisfyThirstGoal;
 import dev.evoworld.core.observer.SimulationObserver;
 import dev.evoworld.core.world.AgentSnapshot;
 import dev.evoworld.core.world.Location;
@@ -62,6 +67,12 @@ public final class SurveyObserver implements SimulationObserver {
     private int foodTripsAbandoned;
     private int foodTripsToNothing;
     private final Map<String, Integer> refusals = new TreeMap<>();
+    private double tickHours;
+    private int sleepTicks;
+    private int sleeps;
+    private int meals;
+    private int drinks;
+    private int upkeepTicks;
 
     private Location twoStepsAgo;
     private Location lastPlace;
@@ -76,6 +87,7 @@ public final class SurveyObserver implements SimulationObserver {
 
     @Override
     public void onSimulationStarted(WorldState state) {
+        onStart(state);
         only(state).ifPresent(agent -> {
             startedHurt = !agent.needs().isFullyHealthy();
             lowestHealth = agent.needs().health();
@@ -98,12 +110,26 @@ public final class SurveyObserver implements SimulationObserver {
                 && chosen.goalName().filter(RecoverHealthGoal.NAME::equals).isPresent()) {
             restsForHealth++;
         }
+        int ticks = chosen.action().durationTicks();
+        if (chosen.action().name().equals(SleepAction.NAME)) {
+            sleeps++;
+            sleepTicks += ticks;
+        }
+        if (isUpkeep(chosen)) {
+            upkeepTicks += ticks;
+        }
     }
 
     @Override
     public void onActionPerformed(long tick, AgentId agentId, ActionOutcome outcome) {
         if (outcome.succeeded() && outcome.actionName().equals(RestAction.NAME)) {
             rests++;
+        }
+        if (outcome.succeeded() && outcome.actionName().equals(EatAction.NAME)) {
+            meals++;
+        }
+        if (outcome.succeeded() && outcome.actionName().equals(DrinkAction.NAME)) {
+            drinks++;
         }
         if (outcome.wasBlocked() || outcome.wasImpossible()) {
             refusals.merge(outcome.actionName(), 1, Integer::sum);
@@ -126,6 +152,9 @@ public final class SurveyObserver implements SimulationObserver {
     @Override
     public void onTickCompleted(WorldState state) {
         ticksRun = state.tick();
+        if (tickHours == 0.0) {
+            onStart(state);
+        }
         only(state).ifPresent(agent -> {
             follow(agent, state.tick());
             if (trip != null && agent.location().equals(trip.target())) {
@@ -190,6 +219,31 @@ public final class SurveyObserver implements SimulationObserver {
     private record Trip(String goal, Location target) {
     }
 
+    /**
+     * Whether a choice was the body's business rather than the agent's own:
+     * sleep, rest, a meal or a drink, and gathering or walking for food and
+     * water. Exploring, and experiments made out of curiosity, are free time.
+     */
+    private static boolean isUpkeep(Decision chosen) {
+        String action = chosen.action().name();
+        if (action.equals(SleepAction.NAME) || action.equals(RestAction.NAME)
+                || action.equals(EatAction.NAME) || action.equals(DrinkAction.NAME)) {
+            return true;
+        }
+        return chosen.goalName()
+                .filter(goal -> goal.equals(SatisfyHungerGoal.NAME) || goal.equals(SatisfyThirstGoal.NAME))
+                .isPresent();
+    }
+
+    private void onStart(WorldState state) {
+        long tick = state.tick();
+        // The tick length, read off the clock once a tick has passed; the start
+        // of a fresh run has none, so the next snapshot supplies it.
+        if (tick > 0) {
+            tickHours = state.time().elapsed().getSeconds() / 3600.0 / tick;
+        }
+    }
+
     /** The one agent a survey run has. */
     private static Optional<AgentSnapshot> only(WorldState state) {
         return state.agents().stream().findFirst();
@@ -214,6 +268,12 @@ public final class SurveyObserver implements SimulationObserver {
                 foodTrips,
                 foodTripsAbandoned,
                 foodTripsToNothing,
-                refusals);
+                refusals,
+                ticksRun * tickHours,
+                sleepTicks * tickHours,
+                sleeps,
+                meals,
+                drinks,
+                upkeepTicks * tickHours);
     }
 }

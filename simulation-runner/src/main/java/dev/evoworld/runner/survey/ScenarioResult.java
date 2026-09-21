@@ -99,6 +99,35 @@ public record ScenarioResult(Scenario scenario, long ticks, List<SeedResult> see
         return all;
     }
 
+    /** Across every seed: hours asleep per simulated day. */
+    public double sleepHoursPerDay() {
+        return perDay(seeds.stream().mapToDouble(SeedResult::sleepHours).sum());
+    }
+
+    public double sleepsPerDay() {
+        return perDay(seeds.stream().mapToInt(SeedResult::sleeps).sum());
+    }
+
+    public double mealsPerDay() {
+        return perDay(seeds.stream().mapToInt(SeedResult::meals).sum());
+    }
+
+    public double drinksPerDay() {
+        return perDay(seeds.stream().mapToInt(SeedResult::drinks).sum());
+    }
+
+    /** The share of all the time lived that was left over after upkeep. */
+    public double freeShare() {
+        double lived = seeds.stream().mapToDouble(SeedResult::hoursLived).sum();
+        double upkeep = seeds.stream().mapToDouble(SeedResult::upkeepHours).sum();
+        return lived <= 0.0 ? 0.0 : Math.max(0.0, 1.0 - upkeep / lived);
+    }
+
+    private double perDay(double total) {
+        double days = seeds.stream().mapToDouble(SeedResult::days).sum();
+        return days <= 0.0 ? 0.0 : total / days;
+    }
+
     public int totalRefusals() {
         return sum(SeedResult::totalRefusals);
     }

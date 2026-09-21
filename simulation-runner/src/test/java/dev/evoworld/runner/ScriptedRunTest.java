@@ -119,7 +119,7 @@ class ScriptedRunTest {
     @DisplayName("a script that runs out leaves the agent idling, not crashing")
     void scriptOutlivesItself() {
         ScriptedDecisionMaker scripted =
-                new ScriptedDecisionMaker(List.of(new RestAction(6.0)), 6.0);
+                new ScriptedDecisionMaker(List.of(new RestAction()));
         World world = WorldGenerator.generate(CONFIG);
         world.addAgent(
                 dev.evoworld.core.agent.Agent.spawn("agent-1", "Atlas", CONFIG.bounds().center()));

@@ -10,9 +10,11 @@ import dev.evoworld.core.action.EatAction;
 import dev.evoworld.core.action.GatherAction;
 import dev.evoworld.core.action.MoveAction;
 import dev.evoworld.core.action.RestAction;
+import dev.evoworld.core.action.SleepAction;
 import dev.evoworld.core.agent.ActivityLevel;
 import dev.evoworld.core.agent.Agent;
 import dev.evoworld.core.agent.AgentId;
+import dev.evoworld.core.agent.Exertion;
 import dev.evoworld.core.agent.Inventory;
 import dev.evoworld.core.agent.MetabolismRates;
 import dev.evoworld.core.agent.Needs;
@@ -65,20 +67,23 @@ public final class SaveFormat {
                 config.bounds().height(),
                 config.perceptionRadius(),
                 new SavedMetabolism(
-                        body.hungerPerTick(),
-                        body.thirstPerTick(),
-                        body.activeEnergyPerTick(),
-                        body.restingEnergyPerTick(),
-                        body.starvationDamage(),
-                        body.dehydrationDamage(),
-                        body.exhaustionDamage(),
-                        body.healingPerTick(),
-                        body.restingHealingPerTick()),
+                        body.hunger(),
+                        body.thirst(),
+                        body.activeEnergy(),
+                        body.restingEnergy(),
+                        body.sleepingEnergy(),
+                        body.starvation(),
+                        body.dehydration(),
+                        body.exhaustion(),
+                        body.activeHealing(),
+                        body.restingHealing(),
+                        body.sleepingHealing()),
                 new SavedActionSettings(
                         actions.moveEnergyCost(),
-                        actions.restEnergyGain(),
+                        actions.walkingStepsPerHour(),
                         actions.gatherAmount(),
                         actions.gatherEnergyCost(),
+                        actions.gatherMinutes(),
                         actions.eatPortion(),
                         actions.drinkGulp()));
     }
@@ -92,20 +97,23 @@ public final class SaveFormat {
                 WorldBounds.of(saved.width(), saved.height()),
                 saved.perceptionRadius(),
                 new MetabolismRates(
-                        body.hungerPerTick(),
-                        body.thirstPerTick(),
-                        body.activeEnergyPerTick(),
-                        body.restingEnergyPerTick(),
-                        body.starvationDamage(),
-                        body.dehydrationDamage(),
-                        body.exhaustionDamage(),
-                        body.healingPerTick(),
-                        body.restingHealingPerTick()),
+                        body.hunger(),
+                        body.thirst(),
+                        body.activeEnergy(),
+                        body.restingEnergy(),
+                        body.sleepingEnergy(),
+                        body.starvation(),
+                        body.dehydration(),
+                        body.exhaustion(),
+                        body.activeHealing(),
+                        body.restingHealing(),
+                        body.sleepingHealing()),
                 new ActionSettings(
                         actions.moveEnergyCost(),
-                        actions.restEnergyGain(),
+                        actions.walkingStepsPerHour(),
                         actions.gatherAmount(),
                         actions.gatherEnergyCost(),
+                        actions.gatherMinutes(),
                         actions.eatPortion(),
                         actions.drinkGulp()));
     }
@@ -137,7 +145,7 @@ public final class SaveFormat {
             Agent agent,
             Action underway,
             long underwayTicksRemaining,
-            ActivityLevel lastActivity,
+            Exertion lastActivity,
             List<Danger> dangers) {
         Needs needs = agent.needs();
         return new SavedAgent(
@@ -176,7 +184,8 @@ public final class SaveFormat {
                         .toList(),
                 underway == null ? null : save(underway),
                 underwayTicksRemaining,
-                lastActivity,
+                lastActivity.level(),
+                lastActivity.comfort(),
                 dangers,
                 agent.intent()
                         .map(intent -> new SavedIntent(
@@ -269,18 +278,21 @@ public final class SaveFormat {
                     null,
                     move.destination().x(),
                     move.destination().y(),
-                    0.0,
-                    move.energyCostPerStep());
-            case RestAction rest -> new SavedAction(
-                    RestAction.NAME, null, null, null, rest.energyGain(), 0.0);
+                    move.stepsPerTick(),
+                    move.energyCostPerStep(),
+                    0);
+            case RestAction rest -> new SavedAction(RestAction.NAME, null, null, null, 0.0, 0.0, 0);
+            case SleepAction sleep -> new SavedAction(
+                    SleepAction.NAME, null, null, null, sleep.comfort(), 0.0, sleep.durationTicks());
             case GatherAction gather -> new SavedAction(
-                    GatherAction.NAME, gather.target(), null, null, gather.amount(), gather.energyCost());
+                    GatherAction.NAME, gather.target(), null, null, gather.amount(), gather.energyCost(),
+                    gather.durationTicks());
             case EatAction eat -> new SavedAction(
-                    EatAction.NAME, eat.food(), null, null, eat.portion(), 0.0);
+                    EatAction.NAME, eat.food(), null, null, eat.portion(), 0.0, 0);
             case DrinkAction drink -> new SavedAction(
-                    DrinkAction.NAME, drink.source(), null, null, drink.gulp(), 0.0);
+                    DrinkAction.NAME, drink.source(), null, null, drink.gulp(), 0.0, 0);
             case DiscardAction discard -> new SavedAction(
-                    DiscardAction.NAME, discard.what(), null, null, discard.amount(), 0.0);
+                    DiscardAction.NAME, discard.what(), null, null, discard.amount(), 0.0, 0);
             default -> throw new IllegalArgumentException(
                     "no save format for " + action.getClass().getSimpleName()
                             + "; add it here before saving a simulation that uses it");
@@ -289,9 +301,12 @@ public final class SaveFormat {
 
     public static Action load(SavedAction saved) {
         return switch (saved.kind()) {
-            case MoveAction.NAME -> new MoveAction(new Location(saved.x(), saved.y()), saved.cost());
-            case RestAction.NAME -> new RestAction(saved.amount());
-            case GatherAction.NAME -> new GatherAction(saved.resource(), saved.amount(), saved.cost());
+            case MoveAction.NAME -> new MoveAction(
+                    new Location(saved.x(), saved.y()), saved.cost(), (int) saved.amount());
+            case RestAction.NAME -> new RestAction();
+            case SleepAction.NAME -> new SleepAction(saved.ticks(), saved.amount());
+            case GatherAction.NAME -> new GatherAction(
+                    saved.resource(), saved.amount(), saved.cost(), saved.ticks());
             case EatAction.NAME -> new EatAction(saved.resource(), saved.amount());
             case DrinkAction.NAME -> new DrinkAction(saved.resource(), saved.amount());
             case DiscardAction.NAME -> new DiscardAction(saved.resource(), saved.amount());

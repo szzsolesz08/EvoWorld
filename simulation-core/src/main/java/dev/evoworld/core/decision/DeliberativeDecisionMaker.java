@@ -3,6 +3,7 @@ package dev.evoworld.core.decision;
 import dev.evoworld.core.ActionSettings;
 import dev.evoworld.core.SimulationConfig;
 import dev.evoworld.core.action.RestAction;
+import dev.evoworld.core.agent.MetabolismRates;
 import dev.evoworld.core.decision.proposal.ApproachRememberedProposer;
 import dev.evoworld.core.decision.proposal.ApproachResourceProposer;
 import dev.evoworld.core.decision.proposal.DiscardProposer;
@@ -12,9 +13,11 @@ import dev.evoworld.core.decision.proposal.ExploreProposer;
 import dev.evoworld.core.decision.proposal.GatherProposer;
 import dev.evoworld.core.decision.proposal.InvestigateProposer;
 import dev.evoworld.core.decision.proposal.RestProposer;
+import dev.evoworld.core.decision.proposal.SleepProposer;
 import dev.evoworld.core.goal.Motivation;
 import dev.evoworld.core.perception.Perception;
 import dev.evoworld.core.random.SimulationRandom;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -38,13 +41,14 @@ public final class DeliberativeDecisionMaker implements DecisionMaker {
     private final List<ActionProposer> proposers;
     private final ActionEvaluator evaluator;
     private final ActionSelector selector;
-    private final double fallbackRestGain;
+
+    /** The longest single sleep: a long night. */
+    public static final Duration LONGEST_SLEEP = Duration.ofHours(10);
 
     public DeliberativeDecisionMaker(
             List<ActionProposer> proposers,
             ActionEvaluator evaluator,
-            ActionSelector selector,
-            double fallbackRestGain) {
+            ActionSelector selector) {
         Objects.requireNonNull(proposers, "proposers");
         if (proposers.isEmpty()) {
             throw new IllegalArgumentException("an agent needs at least one way to act");
@@ -52,32 +56,32 @@ public final class DeliberativeDecisionMaker implements DecisionMaker {
         this.proposers = List.copyOf(proposers);
         this.evaluator = Objects.requireNonNull(evaluator, "evaluator");
         this.selector = Objects.requireNonNull(selector, "selector");
-        this.fallbackRestGain = fallbackRestGain;
     }
 
-    /** The MVP's agent: everything it can do, scored on utility. */
+    /** The standard agent: everything it can do, scored on utility. */
     public static DeliberativeDecisionMaker from(SimulationConfig config) {
         ActionSettings actions = config.actions();
+        Duration tick = config.tickDuration();
+        // Everything here works one tick at a time, so it is given one tick's
+        // worth of the body's rates, and walking and work measured in ticks.
+        MetabolismRates body = config.metabolism().perTick(tick);
+        int steps = actions.stepsPerTick(tick);
+        int nightTicks = (int) Math.max(1L, (LONGEST_SLEEP.getSeconds() + tick.getSeconds() - 1) / tick.getSeconds());
         return new DeliberativeDecisionMaker(
                 List.of(
                         new DrinkProposer(actions.drinkGulp()),
                         new EatProposer(actions.eatPortion()),
-                        new GatherProposer(actions.gatherAmount(), actions.gatherEnergyCost()),
-                        new ApproachResourceProposer(
-                                actions.moveEnergyCost(),
-                                actions.eatPortion(),
-                                actions.drinkGulp()),
-                        new ApproachRememberedProposer(
-                                actions.moveEnergyCost(),
-                                actions.eatPortion(),
-                                actions.drinkGulp()),
+                        new GatherProposer(
+                                actions.gatherAmount(), actions.gatherEnergyCost(), actions.gatherTicks(tick)),
+                        new ApproachResourceProposer(actions.moveEnergyCost(), steps, actions.gatherTicks(tick)),
+                        new ApproachRememberedProposer(actions.moveEnergyCost(), steps, actions.gatherTicks(tick)),
                         new InvestigateProposer(actions.eatPortion()),
                         new DiscardProposer(actions.gatherAmount()),
-                        new RestProposer(actions.restEnergyGain(), config.metabolism()),
-                        new ExploreProposer(actions.moveEnergyCost())),
-                new CommitmentEvaluator(new UtilityEvaluator(config.metabolism())),
-                new HighestUtilitySelector(),
-                actions.restEnergyGain());
+                        new RestProposer(body),
+                        new SleepProposer(body, nightTicks),
+                        new ExploreProposer(actions.moveEnergyCost(), steps)),
+                new CommitmentEvaluator(new UtilityEvaluator(body)),
+                new HighestUtilitySelector());
     }
 
     @Override
@@ -110,7 +114,7 @@ public final class DeliberativeDecisionMaker implements DecisionMaker {
      */
     private Deliberation doNothingMuch() {
         Decision idle = new Decision(
-                new RestAction(fallbackRestGain), 0.0, "nothing worth doing");
+                new RestAction(), 0.0, "nothing worth doing");
         return new Deliberation(List.of(idle), idle);
     }
 }

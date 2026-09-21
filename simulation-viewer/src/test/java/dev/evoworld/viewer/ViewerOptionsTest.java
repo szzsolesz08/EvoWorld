@@ -37,8 +37,8 @@ class ViewerOptionsTest {
         assertEquals(10L, options.seed());
         assertEquals(Scenario.HUNGRY_WORLD, options.scenario());
         assertEquals(Duration.ofMinutes(60), options.config().tickDuration());
-        assertEquals(MetabolismRates.defaults().hungerPerTick() * 1.5,
-                options.config().metabolism().hungerPerTick(), 1e-12);
+        assertEquals(MetabolismRates.defaults().hunger() * 1.5,
+                options.config().metabolism().hunger(), 1e-12);
         assertEquals(30.0, ViewerModel.SPEEDS[options.speedIndex()]);
         assertEquals(Optional.of(Path.of("saves/a.json")), options.load());
         assertEquals(Optional.of(Path.of("shot.png")), options.screenshot());
