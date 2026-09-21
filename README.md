@@ -11,10 +11,10 @@ does, and carries on for weeks of simulated time without anyone touching anythin
 [day 1 19:50] Atlas is starving, and it is starting to hurt (health 98.5)
 [day 1 21:10] Atlas learned berries nourishment: 8.0 hunger per unit (0.25 sure after 1)
 [day 1 21:20] Atlas is no longer starving (health 86.5)
-[day 2 00:50] Atlas learned water hydration: 12.0 thirst per unit (0.25 sure after 1)
+[day 2 01:40] Atlas has fully recovered (health 100.0)
 
 -- day 3 00:00 -- Atlas ------------------------------------------------
-   status     alive, age 2d 0h, health 86.5
+   status     alive, age 2d 0h, health 100.0
    location   (6,5)
    needs      hunger 11.2, thirst 28.8, energy 81.2
    carrying   berries 3.0
@@ -61,7 +61,7 @@ and the full pipeline from perception to learning, running unattended and reprod
 | --- | --- |
 | World | a seeded 16×16 world; berries, water, wood and stone; resources that regrow at their own rates (stone never does) |
 | Time | discrete ticks of configurable simulated length (default 10 minutes); days and hours in all output |
-| Body | hunger, thirst, energy and health; activity-dependent energy use; unmet needs that do damage |
+| Body | hunger, thirst, energy and health; activity-dependent energy use; unmet needs that do damage; healing when looked after, faster at rest |
 | Actions | move, gather, eat, drink, rest, discard; explicit preconditions, structured outcomes, multi-tick work |
 | Perception | a six-step field of view; nothing beyond it is known except by memory |
 | Goals | four wants (thirst, hunger, energy, curiosity) scored from the body, never from a rule |
@@ -160,7 +160,7 @@ knowledge:
 
 ### Goals
 
-Four goals each score themselves from the agent's state. A goal says **what**, never
+Five goals each score themselves from the agent's state. A goal says **what**, never
 **how**. Nothing in the goal layer knows an action exists.
 
 | Goal | Priority |
@@ -168,11 +168,21 @@ Four goals each score themselves from the agent's state. A goal says **what**, n
 | satisfy thirst | `(thirst / 100)²` |
 | satisfy hunger | `(hunger / 100)²` |
 | recover energy | `(1 − energy / 100)²` |
+| recover health | `(1 − health / 100)²` |
 | explore | `0.6 × energy × unexplored fraction × (1 − most pressing need²)` |
 
 Needs accelerate: mild thirst is a murmur, severe thirst drowns everything else.
 Curiosity is what is left once survival has had its say, so a comfortable agent explores
-and a dying one does not.
+and a dying one does not. Injury does *not* quiet curiosity. Exploring is how a newborn
+finds food, and when injury was counted against curiosity, three wounded newborns in
+twenty starved.
+
+**Healing** is metabolism, not an action. Each tick a body that is looked after (hunger
+and thirst at most 50, energy at least 25) regains 0.2 health, or 2.0 if it spent the
+tick resting. Those conditions are far from anything that does damage, so no tick both
+hurts and heals. Most recovery happens on its own, during rests taken for energy. The
+health goal is a tie-break: when nothing else presses, a badly hurt agent rests rather
+than wanders.
 
 ### Deciding: propose, evaluate, select
 
@@ -352,7 +362,7 @@ Each level includes everything below it.
 
 | Level | Shows | Ten simulated days |
 | --- | --- | --- |
-| `quiet` | first discoveries, lessons learned, danger, death | ~20 lines |
+| `quiet` | first discoveries, lessons learned, danger and recovery, death | ~20 lines |
 | `normal` | every event, a status block each simulated day, the map at start and end | ~200 lines |
 | `verbose` | a status block four times a day, and every action the agent completes | ~1,900 lines |
 | `debug` | every perception, want, candidate and score, and the core's own diagnostics | ~10,500 lines |
@@ -367,13 +377,13 @@ seen.
 ## Testing
 
 ```bash
-./gradlew test     # all modules, 491 tests
+./gradlew test     # all modules, 518 tests
 ./gradlew build    # compile, test and assemble
 ```
 
 | Module | Tests | What they cover |
 | --- | --- | --- |
-| core | 440 | every rule, action, goal, proposer and learner; memory, knowledge, exploration, skills; intent and commitment; long-run integration; save and continue |
+| core | 467 | every rule, action, goal, proposer and learner; memory, knowledge, exploration, skills; intent and commitment; healing; long-run integration; save and continue |
 | persistence | 14 | JSON round trips, save-to-file-and-continue, byte stability, strict reading, atomic writes |
 | runner | 37 | options, status report, log levels, autosave, pacing, scripted runs |
 
@@ -388,13 +398,15 @@ The integration tests worth knowing about:
   checks that the agent survives, forages, drinks, rests, explores, learns the right
   values and improves, and that it never repeats a lesson it has been taught. It fails
   any run where the agent walks back and forth between two places, and it holds seed 10,
-  the MVP's one death, to a full 2,000 hourly ticks.
+  the MVP's one death, to a full 2,000 hourly ticks. Agents that start at health 30 must
+  mend and live on, the default run's day-1 injury must be healed within three days, and
+  health may only rise on a tick when the body is well looked after.
 - **`DitheringTest`** sets up the scene seed 10 died in, two bushes with one just out
   of sight, and requires every step to bring the agent closer to the bush it chooses. It
   also tests each of the two faults behind the old oscillation on its own. The MVP fails
   all three tests.
-- **`SaveAndContinueTest`** and **`SaveFileTest`** save at nine points, including mid-job
-  and mid-journey,
+- **`SaveAndContinueTest`** and **`SaveFileTest`** save at nine points, including mid-job,
+  mid-journey and mid-recovery,
   through memory and through real JSON files, and require the continuation to be
   identical to a run that never stopped. That includes a ten-leg relay of save and
   reload.
@@ -409,10 +421,11 @@ Honest ones, most important first.
 
 - **The first day is the dangerous one.** A newborn agent does not know berries are food
   until it tries them, and in the default run it goes hungry enough to lose some health
-  before it does. Once it has learned, it stays out of danger: across 20 seeds × 2,000
-  hourly ticks, no need does any damage at all.
-- **No healing.** Health lost is lost for good. An agent that survives a close call
-  carries the damage for the rest of the run, which makes the next one more dangerous.
+  before it does. It heals within a few hours. Once it has learned, it stays out of
+  danger: across 20 seeds × 2,000 hourly ticks, no need does any damage at all.
+- **Healing is free.** Mending costs no extra food or water, and a hurt agent rarely
+  chooses to stop and rest for it. Recovery is the body's doing, not a decision the agent
+  weighs.
 - **Greedy, one step at a time.** The agent scores the next action, never a sequence.
   Standing in a spring while mildly thirsty, it walks away rather than topping up, because
   nothing models "this saves a walk later".
@@ -428,7 +441,7 @@ Honest ones, most important first.
 - **Hydration is read against the gulp asked for, not the gulp received**, so a spring
   with less than a gulp left would read low. Springs refill fast enough that it has not
   shown up in practice.
-- **Save format version 2 has no migration path.** A save from a different format version
+- **Save format version 3 has no migration path.** A save from a different format version
   is refused rather than converted. Scripted runs cannot be saved at all.
 - **After loading, the status block shows "(not decided yet)"** until the agent's next
   decision. The latest want and decision exist only for display and are not saved.
@@ -437,21 +450,19 @@ Honest ones, most important first.
 
 Roughly in the order they would pay off:
 
-1. **Healing and a health goal**, so a close call can be recovered from, and recovering
-   becomes something an agent chooses to spend time on.
-2. **Learning about actions, not just things.** Feed outcomes back into the evaluator's
+1. **Learning about actions, not just things.** Feed outcomes back into the evaluator's
    weights, so an agent that keeps finding a place empty stops walking to it. The
    `ActionEvaluator` seam exists for this.
-3. **A richer world:** terrain that affects movement, day and night, weather, seasons, and
+2. **A richer world:** terrain that affects movement, day and night, weather, seasons, and
    larger or procedurally generated maps.
-4. **Uses for wood and stone:** crafting or building, giving gathering a purpose beyond
+3. **Uses for wood and stone:** crafting or building, giving gathering a purpose beyond
    food and the inventory a real trade-off.
-5. **More agents**, then what they need: noticing each other, competing for a bush,
+4. **More agents**, then what they need: noticing each other, competing for a bush,
    eventually sharing knowledge.
-6. **A graphical viewer** as another observer, for example with LibGDX. The core needs no
+5. **A graphical viewer** as another observer, for example with LibGDX. The core needs no
    changes for it: everything a viewer would draw already arrives as immutable snapshots
    and events.
-7. **Save migrations**, so older saves can be carried forward rather than refused.
+6. **Save migrations**, so older saves can be carried forward rather than refused.
 
 ## Technology
 

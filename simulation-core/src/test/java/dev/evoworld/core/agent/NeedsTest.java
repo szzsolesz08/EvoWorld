@@ -8,6 +8,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.CsvSource;
 
 class NeedsTest {
 
@@ -322,6 +324,94 @@ class NeedsTest {
             assertEquals(
                     start.afterTick(rates, ActivityLevel.ACTIVE),
                     start.afterTick(rates, ActivityLevel.ACTIVE));
+        }
+    }
+
+    @Nested
+    @DisplayName("healing")
+    class Healing {
+
+        @Test
+        @DisplayName("a body that is looked after mends a little every tick")
+        void aWellKeptBodyHeals() {
+            Needs hurt = new Needs(10.0, 10.0, 80.0, 60.0);
+
+            Needs after = hurt.afterTick(rates, ActivityLevel.ACTIVE);
+
+            assertEquals(60.0 + rates.healingPerTick(), after.health(), EPSILON);
+        }
+
+        @Test
+        @DisplayName("and faster at rest")
+        void restHealsFaster() {
+            Needs hurt = new Needs(10.0, 10.0, 80.0, 60.0);
+
+            double active = hurt.afterTick(rates, ActivityLevel.ACTIVE).health();
+            double resting = hurt.afterTick(rates, ActivityLevel.RESTING).health();
+
+            assertEquals(60.0 + rates.restingHealingPerTick(), resting, EPSILON);
+            assertTrue(resting > active);
+        }
+
+        @ParameterizedTest(name = "{0}")
+        @CsvSource({
+            "too hungry, 60, 10, 80",
+            "too thirsty, 10, 60, 80",
+            "too tired, 10, 10, 20"})
+        @DisplayName("a body that is hungry, thirsty or run down does not heal")
+        void neglectStopsHealing(String why, double hunger, double thirst, double energy) {
+            Needs hurt = new Needs(hunger, thirst, energy, 60.0);
+
+            assertEquals(60.0, hurt.afterTick(rates, ActivityLevel.RESTING).health(), EPSILON);
+        }
+
+        @Test
+        @DisplayName("being well is judged on the state the tick produced")
+        void wellnessUsesThePostTickState() {
+            // Just well enough going in; the tick's thirst pushes it over.
+            Needs edge = new Needs(0.0, Needs.WELL_PRESSURE, 80.0, 60.0);
+
+            assertEquals(60.0, edge.afterTick(rates, ActivityLevel.RESTING).health(), EPSILON);
+        }
+
+        @Test
+        @DisplayName("healing stops at full health")
+        void neverAboveFull() {
+            Needs nearly = new Needs(0.0, 0.0, 80.0, Needs.MAX - 0.05);
+
+            assertEquals(Needs.MAX, nearly.afterTick(rates, ActivityLevel.RESTING).health(), EPSILON);
+        }
+
+        @Test
+        @DisplayName("no tick both hurts and heals")
+        void neverHurtAndHealedAtOnce() {
+            for (double hunger = 0; hunger <= 100; hunger += 5) {
+                for (double energy = 0; energy <= 100; energy += 5) {
+                    Needs before = new Needs(hunger, 0.0, energy, 60.0);
+                    Needs after = before.afterTick(rates, ActivityLevel.RESTING);
+                    boolean hurt = after.isStarving() || after.isDehydrated() || after.isExhausted();
+                    assertTrue(!hurt || after.health() < 60.0, "hurt but healed: " + after);
+                    assertTrue(!after.isWellEnoughToHeal() || after.health() > 60.0,
+                            "well but not healed: " + after);
+                }
+            }
+        }
+
+        @Test
+        @DisplayName("the dead do not heal")
+        void theDeadStayDead() {
+            Needs dead = new Needs(0.0, 0.0, 80.0, Needs.MIN);
+
+            assertEquals(Needs.MIN, dead.afterTick(rates, ActivityLevel.RESTING).health(), EPSILON);
+        }
+
+        @Test
+        @DisplayName("resting may not heal less than being active, and nothing heals backwards")
+        void healingRatesAreSensible() {
+            assertThrows(IllegalArgumentException.class,
+                    () -> new MetabolismRates(0.8, 1.2, 0.5, 0.1, 1.5, 2.0, 1.0, 0.5, 0.1));
+            assertThrows(IllegalArgumentException.class,
+                    () -> new MetabolismRates(0.8, 1.2, 0.5, 0.1, 1.5, 2.0, 1.0, -0.1, 0.5));
         }
     }
 }

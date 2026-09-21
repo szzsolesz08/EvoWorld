@@ -9,6 +9,8 @@ build/
 *.ipr
 *.iws
 .vscode/
+# compiled output of the VS Code / Eclipse Java tooling
+bin/
 .settings/
 .classpath
 .project

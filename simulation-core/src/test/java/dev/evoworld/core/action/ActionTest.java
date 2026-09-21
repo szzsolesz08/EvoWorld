@@ -145,6 +145,16 @@ class ActionTest {
         }
 
         @Test
+        @DisplayName("a wounded agent may rest even when it is not tired")
+        void allowedWhenHurtButRested() {
+            Agent agent = agentAt(MIDDLE, new Needs(0.0, 0.0, 100.0, 60.0));
+
+            ActionOutcome outcome = new RestAction(6.0).execute(agent, world());
+
+            assertTrue(outcome.succeeded());
+        }
+
+        @Test
         @DisplayName("resting is the one action that is not work")
         void restingIsNotWork() {
             assertEquals(ActivityLevel.RESTING, new RestAction(6.0).activityLevel());

@@ -8,5 +8,7 @@ public record SavedMetabolism(
         double restingEnergyPerTick,
         double starvationDamage,
         double dehydrationDamage,
-        double exhaustionDamage) {
+        double exhaustionDamage,
+        double healingPerTick,
+        double restingHealingPerTick) {
 }

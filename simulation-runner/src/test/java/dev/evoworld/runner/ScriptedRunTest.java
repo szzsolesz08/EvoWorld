@@ -54,7 +54,7 @@ class ScriptedRunTest {
     @DisplayName("the forage script uses every action the milestone added")
     void scriptCoversEveryAction() {
         List<Class<?>> kinds = forageScript().stream()
-                .map(Object::getClass)
+                .<Class<?>>map(Object::getClass)
                 .distinct()
                 .toList();
 

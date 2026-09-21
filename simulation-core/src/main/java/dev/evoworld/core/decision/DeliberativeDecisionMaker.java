@@ -73,7 +73,7 @@ public final class DeliberativeDecisionMaker implements DecisionMaker {
                                 actions.drinkGulp()),
                         new InvestigateProposer(actions.eatPortion()),
                         new DiscardProposer(actions.gatherAmount()),
-                        new RestProposer(actions.restEnergyGain()),
+                        new RestProposer(actions.restEnergyGain(), config.metabolism()),
                         new ExploreProposer(actions.moveEnergyCost())),
                 new CommitmentEvaluator(new UtilityEvaluator(config.metabolism())),
                 new HighestUtilitySelector(),

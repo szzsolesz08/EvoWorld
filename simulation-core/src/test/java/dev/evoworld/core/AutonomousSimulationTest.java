@@ -76,6 +76,8 @@ class AutonomousSimulationTest {
         private final List<Location> path = new ArrayList<>();
         private int turnsInARow;
         private long lastStepTick = -1;
+        private double lastHealth = Needs.MAX;
+        double lowestHealth = Needs.MAX;
         int longestDithering;
         String ditheringSeen = "";
 
@@ -159,7 +161,18 @@ class AutonomousSimulationTest {
                         "age " + snapshot.ticksAlive() + " is not the ticks lived");
             }
             checkIntent(snapshot, state, tick);
+            checkHealing(snapshot, tick);
             followPath(snapshot, tick);
+        }
+
+        /** A body only mends when it is looked after, and never while something is hurting it. */
+        private void checkHealing(AgentSnapshot snapshot, long tick) {
+            Needs needs = snapshot.needs();
+            if (needs.health() > lastHealth) {
+                check(needs.isWellEnoughToHeal(), tick, "healed while neglected " + needs);
+            }
+            lastHealth = needs.health();
+            lowestHealth = Math.min(lowestHealth, needs.health());
         }
 
         private void checkIntent(AgentSnapshot snapshot, WorldState state, long tick) {
@@ -229,8 +242,13 @@ class AutonomousSimulationTest {
     }
 
     private Run runAutonomously(SimulationConfig config, long ticks) {
+        return runAutonomously(config, Needs.healthy(), ticks);
+    }
+
+    private Run runAutonomously(SimulationConfig config, Needs startingAs, long ticks) {
         World world = WorldGenerator.generate(config);
-        Agent agent = Agent.spawn("agent-1", "Atlas", config.bounds().center());
+        Agent agent = new Agent(
+                AgentId.of("agent-1"), "Atlas", config.bounds().center(), startingAs);
         world.addAgent(agent);
         Simulation simulation =
                 new Simulation(world, DeliberativeDecisionMaker.from(config), config);
@@ -288,6 +306,36 @@ class AutonomousSimulationTest {
         assertTrue(run.auditor().longestDithering < 2,
                 "walked back and forth " + run.auditor().longestDithering + " times in a row: "
                         + run.auditor().ditheringSeen);
+    }
+
+    @ParameterizedTest(name = "seed {0}")
+    @ValueSource(longs = {1L, 2L, 3L, 4L, 5L, 6L, 7L, 8L})
+    @DisplayName("a close call is no longer for life: starting badly hurt, it mends and lives on")
+    void recoversFromACloseCall(long seed) {
+        Run run = runAutonomously(
+                SimulationConfig.defaults(seed), new Needs(0.0, 0.0, 100.0, 30.0), LONG_RUN);
+
+        assertEquals(List.of(), run.auditor().violations);
+        assertTrue(run.agent().isAlive(), "died after " + run.agent().ticksAlive() + " ticks");
+        assertTrue(run.agent().needs().health() >= 95.0, "still hurt: " + run.agent().needs());
+        long recoveries = run.auditor().count(SimulationEvent.Recovered.class);
+        long dangers = run.auditor().count(SimulationEvent.DangerBegan.class);
+        assertTrue(recoveries >= 1 && recoveries <= dangers + 1,
+                recoveries + " recoveries for " + dangers + " close calls");
+    }
+
+    @Test
+    @DisplayName("the default run's first-day hunger is healed within three days")
+    void theFirstDayIsForgiven() {
+        // Seed 42 is the runner's default. A newborn goes hungry on day one
+        // while it learns berries are food; that used to cost health for good.
+        SimulationConfig config = SimulationConfig.defaults(42L);
+        Run run = runAutonomously(config, 3 * 144L);
+
+        assertTrue(run.auditor().lowestHealth < Needs.MAX, "the scare should still happen");
+        assertEquals(Needs.MAX, run.agent().needs().health(), 1e-9);
+        assertEquals(1L, run.auditor().count(SimulationEvent.Recovered.class));
+        assertEquals(List.of(), run.auditor().violations);
     }
 
     // --- capability -------------------------------------------------------

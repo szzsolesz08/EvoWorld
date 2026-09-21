@@ -43,6 +43,14 @@ final class ExpectedRelief {
         return Math.min(energyGain, Needs.MAX - needs.energy()) / Needs.MAX;
     }
 
+    /**
+     * What stopping for a tick would do for health: the healing a tick at
+     * rest brings beyond what carrying on would have brought anyway.
+     */
+    static double fromHealing(Needs needs, double extraHealing) {
+        return Math.min(Math.max(extraHealing, 0.0), Needs.MAX - needs.health()) / Needs.MAX;
+    }
+
     /** Whether the agent thinks this is worth putting in its mouth at all. */
     static boolean thinksItIsFood(Knowledge knowledge, ResourceType type) {
         return knowledge.estimate(BeliefKind.NOURISHMENT, type) > 0.0;

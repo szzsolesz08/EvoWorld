@@ -384,6 +384,10 @@ public final class Simulation {
         MemoryRecorder.rememberHarm(
                 agent.memory(), agent.location(), now, agent.needs(), healthLost);
         reportDangerChanges(agent, now);
+        if (!before.isFullyHealthy() && agent.needs().isFullyHealthy()) {
+            emit(new SimulationEvent.Recovered(
+                    now, agent.id(), agent.name(), agent.needs().health()));
+        }
 
         if (!agent.isAlive()) {
             // Nothing half-finished survives the agent that was doing it.

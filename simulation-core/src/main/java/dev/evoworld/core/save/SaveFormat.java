@@ -71,7 +71,9 @@ public final class SaveFormat {
                         body.restingEnergyPerTick(),
                         body.starvationDamage(),
                         body.dehydrationDamage(),
-                        body.exhaustionDamage()),
+                        body.exhaustionDamage(),
+                        body.healingPerTick(),
+                        body.restingHealingPerTick()),
                 new SavedActionSettings(
                         actions.moveEnergyCost(),
                         actions.restEnergyGain(),
@@ -96,7 +98,9 @@ public final class SaveFormat {
                         body.restingEnergyPerTick(),
                         body.starvationDamage(),
                         body.dehydrationDamage(),
-                        body.exhaustionDamage()),
+                        body.exhaustionDamage(),
+                        body.healingPerTick(),
+                        body.restingHealingPerTick()),
                 new ActionSettings(
                         actions.moveEnergyCost(),
                         actions.restEnergyGain(),

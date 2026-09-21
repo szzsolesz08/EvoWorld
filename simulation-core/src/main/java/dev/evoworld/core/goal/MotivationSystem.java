@@ -30,7 +30,7 @@ public final class MotivationSystem {
     }
 
     /**
-     * The four wants of the MVP.
+     * The five wants an agent has.
      *
      * <p>Registration order is the tie-break, so it reads as a standing
      * preference: when two wants are exactly equal, survival comes before
@@ -41,6 +41,7 @@ public final class MotivationSystem {
                 new SatisfyThirstGoal(),
                 new SatisfyHungerGoal(),
                 new RecoverEnergyGoal(),
+                new RecoverHealthGoal(),
                 new ExploreGoal()));
     }
 

@@ -24,6 +24,12 @@ public record Needs(double hunger, double thirst, double energy, double health) 
     /** Above this, a pressure starts damaging health. */
     public static final double CRITICAL_PRESSURE = 95.0;
 
+    /** At or below this, hunger and thirst leave a body free to heal. */
+    public static final double WELL_PRESSURE = 50.0;
+
+    /** At or above this, a body has the energy to spare for healing. */
+    public static final double WELL_ENERGY = 25.0;
+
     public Needs {
         hunger = clamp(hunger);
         thirst = clamp(thirst);
@@ -55,6 +61,22 @@ public record Needs(double hunger, double thirst, double energy, double health) 
 
     public boolean isExhausted() {
         return energy <= MIN;
+    }
+
+    /**
+     * Whether this body is looked after well enough to mend: alive, neither
+     * hungry nor thirsty beyond half way, and not run down. Far from every
+     * condition that does damage, so a body is never hurt and healed at once.
+     */
+    public boolean isWellEnoughToHeal() {
+        return isAlive()
+                && hunger <= WELL_PRESSURE
+                && thirst <= WELL_PRESSURE
+                && energy >= WELL_ENERGY;
+    }
+
+    public boolean isFullyHealthy() {
+        return health >= MAX;
     }
 
     // --- changes ----------------------------------------------------------
@@ -89,7 +111,9 @@ public record Needs(double hunger, double thirst, double energy, double health) 
 
     /**
      * Applies one tick of metabolism: pressures rise, energy drains at the rate
-     * the activity costs, and unmet needs take their toll on health.
+     * the activity costs, unmet needs take their toll on health, and a body
+     * that is well looked after mends a little - more if it spent the tick at
+     * rest.
      *
      * <p>A pure function of the current state, which keeps the rule
      * deterministic and directly testable.
@@ -100,7 +124,8 @@ public record Needs(double hunger, double thirst, double energy, double health) 
         double nextEnergy = energy - rates.energyDrainFor(activity);
 
         Needs drained = new Needs(nextHunger, nextThirst, nextEnergy, health);
-        return drained.harm(damageFrom(drained, rates));
+        Needs harmed = drained.harm(damageFrom(drained, rates));
+        return harmed.isWellEnoughToHeal() ? harmed.heal(rates.healingFor(activity)) : harmed;
     }
 
     /** Health lost this tick to needs that have gone unmet. */

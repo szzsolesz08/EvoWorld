@@ -8,10 +8,13 @@ import java.util.Locale;
 import java.util.Optional;
 
 /**
- * Stay put and recover energy.
+ * Stay put and recover.
  *
  * <p>The only action that declares itself {@link ActivityLevel#RESTING}, which
- * is what makes it a net gain rather than a smaller loss.
+ * is what makes it a net gain rather than a smaller loss. It restores energy
+ * directly; health it leaves to the body, which heals faster through a tick
+ * spent at rest - so resting is worth doing for a wounded agent that is not
+ * tired at all.
  */
 public final class RestAction extends Action {
 
@@ -42,8 +45,9 @@ public final class RestAction extends Action {
 
     @Override
     protected Optional<Refusal> precondition(Agent agent, World world) {
-        if (agent.needs().energy() >= Needs.MAX) {
-            return Optional.of(Refusal.now("already fully rested"));
+        Needs needs = agent.needs();
+        if (needs.energy() >= Needs.MAX && needs.isFullyHealthy()) {
+            return Optional.of(Refusal.now("nothing to recover"));
         }
         return Optional.empty();
     }

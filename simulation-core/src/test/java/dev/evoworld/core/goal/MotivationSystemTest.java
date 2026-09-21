@@ -80,6 +80,7 @@ class MotivationSystemTest {
             assertEquals(0.0, motivation.priorityOf(SatisfyHungerGoal.NAME), EPSILON);
             assertEquals(0.0, motivation.priorityOf(SatisfyThirstGoal.NAME), EPSILON);
             assertEquals(0.0, motivation.priorityOf(RecoverEnergyGoal.NAME), EPSILON);
+            assertEquals(0.0, motivation.priorityOf(RecoverHealthGoal.NAME), EPSILON);
         }
 
         @Test
@@ -123,6 +124,29 @@ class MotivationSystemTest {
             assertEquals(0.0, priorityOf(ExploreGoal.NAME, needs(0, 0, 0)), EPSILON);
         }
 
+        @Test
+        @DisplayName("injury raises the want to mend, on the same curve as tiredness")
+        void injuryDrivesTheHealthGoal() {
+            double scratched = priorityOf(RecoverHealthGoal.NAME, new Needs(0, 0, 100, 90));
+            double halfDead = priorityOf(RecoverHealthGoal.NAME, new Needs(0, 0, 100, 50));
+
+            assertEquals(0.01, scratched, EPSILON);
+            assertEquals(0.25, halfDead, EPSILON);
+            assertEquals(0.0, priorityOf(RecoverHealthGoal.NAME, needs(0, 0, 100)), EPSILON);
+        }
+
+        @Test
+        @DisplayName("injury does not quiet curiosity: exploring is how an agent finds food")
+        void injuryLeavesCuriosityAlone() {
+            // Tried and measured: counting injury against curiosity starved
+            // three agents in twenty that started hurt and did not yet know
+            // where anything was.
+            assertEquals(
+                    priorityOf(ExploreGoal.NAME, needs(0, 0, 100)),
+                    priorityOf(ExploreGoal.NAME, new Needs(0, 0, 100, 30)),
+                    EPSILON);
+        }
+
         @ParameterizedTest
         @ValueSource(doubles = {0, 10, 25, 50, 75, 90, 100})
         @DisplayName("every want rises with its need and never falls")
@@ -134,6 +158,9 @@ class MotivationSystemTest {
 
             assertTrue(thirstWorse >= thirstHere, "thirst at " + level);
             assertTrue(restWorse >= restHere, "energy at " + level);
+            double healHere = priorityOf(RecoverHealthGoal.NAME, new Needs(0, 0, 100, level));
+            double healWorse = priorityOf(RecoverHealthGoal.NAME, new Needs(0, 0, 100, level - 5));
+            assertTrue(healWorse >= healHere, "health at " + level);
         }
 
         @Test
@@ -199,12 +226,12 @@ class MotivationSystemTest {
         }
 
         @Test
-        @DisplayName("all four wants are weighed every time, not just the winner")
+        @DisplayName("all five wants are weighed every time, not just the winner")
         void everyGoalIsWeighed() {
-            Motivation motivation = assess(needs(40, 40, 40));
+            Motivation motivation = assess(new Needs(40, 40, 40, 60));
 
-            assertEquals(4, motivation.goals().size());
-            assertEquals(4, motivation.wanted().size());
+            assertEquals(5, motivation.goals().size());
+            assertEquals(5, motivation.wanted().size());
             assertTrue(motivation.goals().contains(motivation.dominant()));
         }
 
@@ -213,7 +240,7 @@ class MotivationSystemTest {
         void unwantedGoalsAreStillReported() {
             Motivation motivation = assess(Needs.healthy());
 
-            assertEquals(4, motivation.goals().size());
+            assertEquals(5, motivation.goals().size());
             assertEquals(1, motivation.wanted().size(), "only exploring is actually wanted");
             assertFalse(motivation.forGoal(SatisfyHungerGoal.NAME).orElseThrow().isWanted());
         }

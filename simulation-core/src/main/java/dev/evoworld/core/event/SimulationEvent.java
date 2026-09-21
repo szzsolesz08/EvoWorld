@@ -17,8 +17,8 @@ import java.util.Objects;
  * deliberation and every candidate that lost - which is what you want when
  * debugging a decision and far too much when watching a life. Events are the
  * other end of that: the handful of moments a narrator would mention. A find, a
- * lesson, a close call, getting better at something, dying, and once a day a
- * summary of how things stand.
+ * lesson, a close call and the recovery from it, getting better at something,
+ * dying, and once a day a summary of how things stand.
  *
  * <p>The set is sealed on purpose. Every kind of event is listed here, in one
  * place, so "what does the simulation consider worth reporting" has a single
@@ -104,6 +104,16 @@ public sealed interface SimulationEvent {
                     agentName,
                     danger.label(),
                     health);
+        }
+    }
+
+    /** Health lost to a close call has all come back. */
+    record Recovered(SimulationTime time, AgentId agentId, String agentName, double health)
+            implements SimulationEvent {
+
+        public String describe() {
+            return String.format(
+                    Locale.ROOT, "%s has fully recovered (health %.1f)", agentName, health);
         }
     }
 

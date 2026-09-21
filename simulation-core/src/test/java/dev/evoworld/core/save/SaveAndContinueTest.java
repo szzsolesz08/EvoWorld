@@ -9,6 +9,7 @@ import dev.evoworld.core.SimulationConfig;
 import dev.evoworld.core.action.ActionOutcome;
 import dev.evoworld.core.agent.Agent;
 import dev.evoworld.core.agent.AgentId;
+import dev.evoworld.core.agent.Needs;
 import dev.evoworld.core.decision.Decision;
 import dev.evoworld.core.decision.DeliberativeDecisionMaker;
 import dev.evoworld.core.event.SimulationEvent;
@@ -163,6 +164,36 @@ class SaveAndContinueTest {
 
         assertEquals(whole.from(midJourney), rest.lines, "the same steps, to the same place");
         assertEquals(unbroken.save(), resumed.save());
+    }
+
+    @Test
+    @DisplayName("a save taken part-way through mending carries on mending exactly as before")
+    void aRecoverySurvivesASave() {
+        Simulation unbroken = hurt(5L);
+        Transcript whole = new Transcript();
+        unbroken.addObserver(whole);
+        unbroken.run(300);
+
+        Simulation interrupted = hurt(5L);
+        interrupted.run(60);
+        double healthAtSave = atlas(interrupted).needs().health();
+        assertTrue(healthAtSave > 30.0 && healthAtSave < 100.0, "mid-recovery: " + healthAtSave);
+        Simulation resumed = Simulation.load(interrupted.save());
+        Transcript rest = new Transcript();
+        resumed.addObserver(rest);
+        resumed.run(240);
+
+        assertEquals(whole.from(60), rest.lines);
+        assertEquals(unbroken.save(), resumed.save());
+    }
+
+    private static Simulation hurt(long seed) {
+        SimulationConfig config = SimulationConfig.defaults(seed);
+        World world = WorldGenerator.generate(config);
+        world.addAgent(new Agent(
+                AgentId.of("agent-1"), "Atlas", config.bounds().center(),
+                new Needs(0.0, 0.0, 100.0, 30.0)));
+        return new Simulation(world, DeliberativeDecisionMaker.from(config), config);
     }
 
     @Test

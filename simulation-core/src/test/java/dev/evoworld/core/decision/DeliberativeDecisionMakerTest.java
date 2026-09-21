@@ -16,6 +16,7 @@ import dev.evoworld.core.agent.AgentId;
 import dev.evoworld.core.agent.Needs;
 import dev.evoworld.core.goal.Motivation;
 import dev.evoworld.core.goal.MotivationSystem;
+import dev.evoworld.core.goal.RecoverHealthGoal;
 import dev.evoworld.core.knowledge.BeliefKind;
 import dev.evoworld.core.knowledge.Knowledge;
 import dev.evoworld.core.perception.Perception;
@@ -73,13 +74,27 @@ class DeliberativeDecisionMakerTest {
         }
 
         Situation body(double hunger, double thirst, double energy) {
+            return body(hunger, thirst, energy, Needs.MAX);
+        }
+
+        Situation body(double hunger, double thirst, double energy, double health) {
             Agent replacement = new Agent(
                     AgentId.of("agent-1"),
                     "Atlas",
                     agent.location(),
-                    new Needs(hunger, thirst, energy, Needs.MAX));
+                    new Needs(hunger, thirst, energy, health));
             replacement.updateKnowledge(agent.knowledge());
             agent = replacement;
+            return this;
+        }
+
+        /** Has stood in every part of the world, just now: nothing left to find out. */
+        Situation knowingTheWorld() {
+            for (int x = 0; x < CONFIG.bounds().width(); x += 4) {
+                for (int y = 0; y < CONFIG.bounds().height(); y += 4) {
+                    agent.exploration().sight(CONFIG.bounds(), new Location(x, y), NOW);
+                }
+            }
             return this;
         }
 
@@ -271,6 +286,55 @@ class DeliberativeDecisionMakerTest {
             assertEquals(
                     RestAction.NAME,
                     situation().body(60, 60, 4).with(ResourceType.WATER, 2, 8).chosenAction());
+        }
+    }
+
+    @Nested
+    @DisplayName("hurt")
+    class Hurt {
+
+        private List<String> restsFor(Situation situation) {
+            return situation.decide().considered().stream()
+                    .filter(decision -> decision.action().name().equals(RestAction.NAME))
+                    .map(decision -> decision.goalName().orElse(""))
+                    .toList();
+        }
+
+        @Test
+        @DisplayName("badly hurt with nothing new to find, it rests to mend rather than wander")
+        void restsToHealWhenIdle() {
+            Deliberation hurt = situation().body(0, 0, 100, 10).knowingTheWorld().decide();
+            Deliberation whole = situation().body(0, 0, 100, 100).knowingTheWorld().decide();
+
+            assertEquals(RestAction.NAME, hurt.chosen().action().name());
+            assertEquals(RecoverHealthGoal.NAME, hurt.chosen().goalName().orElseThrow());
+            assertEquals(MoveAction.NAME, whole.chosen().action().name(), "a whole agent wanders");
+        }
+
+        @Test
+        @DisplayName("hurt in a world it has barely seen, it still goes looking - that is how it finds food")
+        void curiosityStillWinsInANewWorld() {
+            assertEquals(MoveAction.NAME, situation().body(0, 0, 100, 30).chosenAction());
+        }
+
+        @Test
+        @DisplayName("resting to mend is only offered when resting would mend")
+        void noHealingRestWhileNeglected() {
+            assertTrue(restsFor(situation().body(0, 0, 100, 60)).contains(RecoverHealthGoal.NAME));
+            assertFalse(restsFor(situation().body(70, 0, 100, 60)).contains(RecoverHealthGoal.NAME),
+                    "a hungry agent heals nothing by sitting down");
+            assertEquals(List.of(), restsFor(situation().body(0, 0, 100, 100)),
+                    "whole and rested, there is nothing to rest for");
+        }
+
+        @Test
+        @DisplayName("hurt and hungry, it goes for food first - that is what lets it heal")
+        void foodBeforeRest() {
+            Deliberation deliberation =
+                    situation().body(80, 0, 100, 40).with(ResourceType.BERRIES, 8, 5).decide();
+
+            assertTrue(deliberation.chosen().rationale().contains("hunger"),
+                    deliberation.chosen().rationale());
         }
     }
 
