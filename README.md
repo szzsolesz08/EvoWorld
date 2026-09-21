@@ -379,9 +379,12 @@ seen.
 ```bash
 ./gradlew survey                                  # every scenario, seeds 1-20
 ./gradlew survey -Pscenarios=wounded -Pdetail     # one scenario, a row per seed
-./gradlew survey -Pseeds=1-5,9 -Pticks=500        # other seeds, shorter runs
-./gradlew survey -Pout=docs/survey.md -Pdetail    # refresh the committed report
+./gradlew survey "-Pseeds=1-5,9" -Pticks=500      # other seeds, shorter runs
+./gradlew survey "-Pout=docs/survey.md" -Pdetail  # refresh the committed report
 ```
+
+Quote any `-P` value that contains a dot or a comma. PowerShell otherwise splits it
+into separate arguments, and Gradle reports a missing task such as `.md`.
 
 The survey runs each scenario on each seed, in parallel, and prints one row per
 scenario. It takes a few seconds. It watches the runs through the observer interface, so

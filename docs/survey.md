@@ -1,6 +1,6 @@
 # EvoWorld survey
 
-Seeds 1-20, measured on commit b449bdb with uncommitted changes. Regenerate with `./gradlew survey`.
+Seeds 1-20, measured on commit d82b7b3. Regenerate with `./gradlew survey`.
 
 | Scenario | Ticks | Survived | Close calls | Lowest health | Mean final health | Mended | Ticks to mend | Rests | For health | Turn-backs | Dithering runs | Food/water trips | Abandoned | To nothing | Refused |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
