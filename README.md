@@ -374,10 +374,48 @@ location, the goal behind its latest decision, what it is doing (or last did), i
 relevant memories, what it has worked out, its skills and how much of the world it has
 seen.
 
+## Measuring survival
+
+```bash
+./gradlew survey                                  # every scenario, seeds 1-20
+./gradlew survey -Pscenarios=wounded -Pdetail     # one scenario, a row per seed
+./gradlew survey -Pseeds=1-5,9 -Pticks=500        # other seeds, shorter runs
+./gradlew survey -Pout=docs/survey.md -Pdetail    # refresh the committed report
+```
+
+The survey runs each scenario on each seed, in parallel, and prints one row per
+scenario. It takes a few seconds. It watches the runs through the observer interface, so
+measuring cannot change a run, and the report is the same however many threads there are.
+
+| Scenario | What it stresses |
+| --- | --- |
+| `baseline` | the default run: 10-minute ticks, 20 days |
+| `hourly` | 60-minute ticks, 2,000 of them (83 days) |
+| `wounded` | starts at health 30 |
+| `hungry-world` | hunger and thirst rise 1.5 times as fast |
+| `sparse` | half the resource nodes |
+
+Most columns are what they say. A few need a definition:
+
+- **Close calls**: times a need started doing damage.
+- **Mended / Ticks to mend**: for runs that start hurt, how many got back to full health,
+  and how long it took on average.
+- **Turn-backs**: steps that undo the step taken the tick before. **Dithering runs** are
+  two or more of them in a row, the failure that killed seed 10 in the MVP.
+- **Food/water trips**: trips set out on for food or water that ended. **Abandoned**
+  ones ended short of the target. **To nothing** ones had a bare target when they ended,
+  whether reached or given up.
+- **Refused**: actions the world said no to. Most are experiments, such as trying to
+  drink stone.
+
+[docs/survey.md](docs/survey.md) is the committed report for the current code. A
+milestone that changes behaviour regenerates it, so `git diff docs/survey.md` shows what
+the change did.
+
 ## Testing
 
 ```bash
-./gradlew test     # all modules, 518 tests
+./gradlew test     # all modules, 541 tests
 ./gradlew build    # compile, test and assemble
 ```
 
@@ -385,7 +423,7 @@ seen.
 | --- | --- | --- |
 | core | 467 | every rule, action, goal, proposer and learner; memory, knowledge, exploration, skills; intent and commitment; healing; long-run integration; save and continue |
 | persistence | 14 | JSON round trips, save-to-file-and-continue, byte stability, strict reading, atomic writes |
-| runner | 37 | options, status report, log levels, autosave, pacing, scripted runs |
+| runner | 60 | options, status report, log levels, autosave, pacing, scripted runs; the survey's scenarios, measurements and determinism |
 
 Tests assert behaviour, not arithmetic, wherever they can: "a desperate agent does not
 stop to taste a rock", "having learned stone is not food, it stops trying to eat stone".
@@ -450,9 +488,9 @@ Honest ones, most important first.
 
 Roughly in the order they would pay off:
 
-1. **Learning about actions, not just things.** Feed outcomes back into the evaluator's
-   weights, so an agent that keeps finding a place empty stops walking to it. The
-   `ActionEvaluator` seam exists for this.
+1. **Memory that changes decisions.** Failures and close calls are remembered but never
+   read. The survey shows food trips are almost never wasted in today's world, so this
+   will pay off once the world is harder (item 2), rather than before.
 2. **A richer world:** terrain that affects movement, day and night, weather, seasons, and
    larger or procedurally generated maps.
 3. **Uses for wood and stone:** crafting or building, giving gathering a purpose beyond
