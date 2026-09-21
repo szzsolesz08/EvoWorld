@@ -74,7 +74,8 @@ public final class ExploreProposer implements ActionProposer {
     }
 
     private ActionCandidate head(Location target, int steps, double novelty, String why) {
-        return new ActionCandidate(
+        return ActionCandidate.heading(
+                target,
                 new MoveAction(target, moveEnergyCost),
                 ExploreGoal.NAME,
                 novelty,

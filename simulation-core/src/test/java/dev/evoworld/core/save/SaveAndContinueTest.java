@@ -129,6 +129,43 @@ class SaveAndContinueTest {
     }
 
     @Test
+    @DisplayName("a save taken part-way to somewhere carries on to the same place after loading")
+    void aJourneySurvivesASave() {
+        // Find a tick where the agent has set out somewhere and not yet arrived.
+        Simulation probe = fresh(7L);
+        long midJourney = -1;
+        for (long tick = 1; tick <= TOTAL && midJourney < 0; tick++) {
+            probe.tick();
+            Agent agent = atlas(probe);
+            long now = tick;
+            if (agent.intent().filter(intent -> intent.startingDistance() >= 3
+                    && !intent.isReachedFrom(agent.location())
+                    && intent.formedAtTick() < now).isPresent()) {
+                midJourney = tick;
+            }
+        }
+        assertTrue(midJourney > 0, "the run should travel somewhere at some point");
+
+        Simulation unbroken = fresh(7L);
+        Transcript whole = new Transcript();
+        unbroken.addObserver(whole);
+        unbroken.run(midJourney + 50);
+
+        Simulation interrupted = fresh(7L);
+        interrupted.run(midJourney);
+        SavedSimulation saved = interrupted.save();
+        assertTrue(saved.agents().get(0).intent() != null, "the intent should be in the save");
+        Simulation resumed = Simulation.load(saved);
+        assertEquals(atlas(interrupted).intent(), atlas(resumed).intent());
+        Transcript rest = new Transcript();
+        resumed.addObserver(rest);
+        resumed.run(50);
+
+        assertEquals(whole.from(midJourney), rest.lines, "the same steps, to the same place");
+        assertEquals(unbroken.save(), resumed.save());
+    }
+
+    @Test
     @DisplayName("saving is looking, not touching: a run that was saved is the run it would have been")
     void savingChangesNothing() {
         Simulation plain = fresh(3L);

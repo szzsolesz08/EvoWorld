@@ -1,6 +1,7 @@
 package dev.evoworld.core.agent;
 
 import dev.evoworld.core.exploration.ExplorationMap;
+import dev.evoworld.core.intent.Intent;
 import dev.evoworld.core.knowledge.Knowledge;
 import dev.evoworld.core.memory.MemoryStore;
 import dev.evoworld.core.resource.ResourceType;
@@ -8,6 +9,7 @@ import dev.evoworld.core.skill.Skills;
 import dev.evoworld.core.world.AgentSnapshot;
 import dev.evoworld.core.world.Location;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * A living entity in the world.
@@ -34,6 +36,7 @@ public final class Agent {
     private final MemoryStore memory;
     private final ExplorationMap exploration;
     private long ticksAlive;
+    private Optional<Intent> intent = Optional.empty();
 
     public Agent(AgentId id, String name, Location location, Needs needs, Inventory inventory) {
         this(id, name, location, needs, inventory, new MemoryStore(), new ExplorationMap());
@@ -73,7 +76,8 @@ public final class Agent {
             Knowledge knowledge,
             Skills skills,
             MemoryStore memory,
-            ExplorationMap exploration) {
+            ExplorationMap exploration,
+            Optional<Intent> intent) {
         if (ticksAlive < 0) {
             throw new IllegalArgumentException("age must not be negative, was " + ticksAlive);
         }
@@ -81,6 +85,7 @@ public final class Agent {
         agent.ticksAlive = ticksAlive;
         agent.knowledge = Objects.requireNonNull(knowledge, "knowledge");
         agent.skills = Objects.requireNonNull(skills, "skills");
+        agent.intent = Objects.requireNonNull(intent, "intent");
         return agent;
     }
 
@@ -169,6 +174,11 @@ public final class Agent {
         return memory;
     }
 
+    /** Where this agent has set out for, if anywhere. */
+    public Optional<Intent> intent() {
+        return intent;
+    }
+
     /** How many ticks this agent has been alive. Stops when it dies. */
     public long ticksAlive() {
         return ticksAlive;
@@ -230,6 +240,16 @@ public final class Agent {
         return taken;
     }
 
+    /** Sets out for somewhere, putting aside whatever it was heading for before. */
+    public void commitTo(Intent newIntent) {
+        this.intent = Optional.of(Objects.requireNonNull(newIntent, "intent"));
+    }
+
+    /** Stops heading anywhere in particular: arrived, stuck, or dead. */
+    public void giveUpIntent() {
+        this.intent = Optional.empty();
+    }
+
     // --- what time does to an agent ---------------------------------------
 
     /**
@@ -251,7 +271,8 @@ public final class Agent {
 
     /** An immutable copy of everything observable about this agent right now. */
     public AgentSnapshot snapshot() {
-        return new AgentSnapshot(id, name, location, needs, inventory, ticksAlive, isAlive());
+        return new AgentSnapshot(
+                id, name, location, needs, inventory, ticksAlive, isAlive(), intent);
     }
 
     @Override

@@ -137,11 +137,21 @@ public final class PerceptionSystem {
             List<PerceivedResource> visible) {
         List<Location> inSight = visible.stream().map(PerceivedResource::location).toList();
 
+        // Asked for enough to fill the list after what is in sight is left out.
+        // Asking for the usual number and filtering afterwards let the stone and
+        // wood underfoot crowd out the spring an agent was walking to, which
+        // then vanished from its mind for as long as it stood near them.
+        RecallQuery query = RecallQuery.from(time, here)
+                .ofKind(MemoryKind.RESOURCE_LOCATION)
+                .limitedTo(RecallQuery.DEFAULT_LIMIT + inSight.size());
+
         List<RememberedResource> places = new ArrayList<>();
-        for (Recollection recalled :
-                memory.recall(RecallQuery.from(time, here).ofKind(MemoryKind.RESOURCE_LOCATION))) {
+        for (Recollection recalled : memory.recall(query)) {
             if (inSight.contains(recalled.location())) {
                 continue;
+            }
+            if (places.size() == RecallQuery.DEFAULT_LIMIT) {
+                break;
             }
             places.add(RememberedResource.recalledFrom(
                     here,

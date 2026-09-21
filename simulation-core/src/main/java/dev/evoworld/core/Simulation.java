@@ -15,6 +15,7 @@ import dev.evoworld.core.event.SimulationEvent.Danger;
 import dev.evoworld.core.goal.GoalPriority;
 import dev.evoworld.core.goal.Motivation;
 import dev.evoworld.core.goal.MotivationSystem;
+import dev.evoworld.core.intent.Intent;
 import dev.evoworld.core.knowledge.Belief;
 import dev.evoworld.core.knowledge.Knowledge;
 import dev.evoworld.core.knowledge.KnowledgeLearner;
@@ -30,6 +31,7 @@ import dev.evoworld.core.save.SavedSimulation;
 import dev.evoworld.core.skill.SkillLevel;
 import dev.evoworld.core.status.AgentStatus;
 import dev.evoworld.core.skill.Skills;
+import dev.evoworld.core.world.Location;
 import dev.evoworld.core.world.World;
 import dev.evoworld.core.world.WorldState;
 import java.time.Duration;
@@ -386,6 +388,7 @@ public final class Simulation {
         if (!agent.isAlive()) {
             // Nothing half-finished survives the agent that was doing it.
             underway.remove(agent.id());
+            agent.giveUpIntent();
             String cause = causeOfDeath(agent.needs());
             log.info("tick {}: agent {} died of {}", now.tick(), agent.id(), cause);
             notifyAll(observer -> observer.onAgentDied(now.tick(), agent.id()));
@@ -418,6 +421,7 @@ public final class Simulation {
         // multi-tick action can be overtaken by events and must then block.
         ActionOutcome outcome = action.execute(agent, world);
         // 11. process the consequences
+        settleIntent(agent, now.tick());
         notifyAll(observer -> observer.onActionPerformed(now.tick(), agent.id(), outcome));
         // 12. create memories
         MemoryRecorder.rememberOutcome(agent.memory(), action, outcome, agent.location(), now);
@@ -437,6 +441,7 @@ public final class Simulation {
      */
     private Action decide(Agent agent, SimulationTime now) {
         long tick = now.tick();
+        settleIntent(agent, tick);
 
         // 4, 5. perceive, with relevant memories recalled alongside
         Perception perception = senses.perceive(agent, world, now);
@@ -452,9 +457,42 @@ public final class Simulation {
         // 7, 8, 9. candidates, evaluation, selection
         Deliberation deliberation = decisionMaker.deliberate(perception, motivation, random);
         lastDecision.put(agent.id(), deliberation.chosen());
+        followThrough(agent, deliberation.chosen(), tick);
         notifyAll(observer -> observer.onDecision(
                 tick, agent.id(), deliberation.chosen(), deliberation.considered()));
         return deliberation.chosen().action();
+    }
+
+    /**
+     * An intent that has been fulfilled, or has dragged on far too long, is let
+     * go. Checked as soon as an action lands, so nobody watching sees an agent
+     * still heading for where it is standing, and again before deciding, so a
+     * spent intent cannot tip a decision it no longer deserves to.
+     */
+    private static void settleIntent(Agent agent, long tick) {
+        agent.intent()
+                .filter(intent -> intent.isReachedFrom(agent.location()) || intent.isStale(tick))
+                .ifPresent(intent -> agent.giveUpIntent());
+    }
+
+    /**
+     * After choosing: heading somewhere new sets the agent out on a new intent;
+     * heading where it was already going keeps the one it has. A choice that
+     * heads nowhere - a rest, a meal on the way - is a pause, not a change of
+     * mind, and leaves the intent where it was.
+     */
+    private static void followThrough(Agent agent, Decision chosen, long tick) {
+        if (chosen.target().isEmpty() || chosen.goalName().isEmpty()) {
+            return;
+        }
+        String goal = chosen.goalName().get();
+        Location target = chosen.target().get();
+        boolean carryingOn = agent.intent()
+                .filter(intent -> intent.isFor(goal, target))
+                .isPresent();
+        if (!carryingOn) {
+            agent.commitTo(Intent.formed(goal, target, agent.location(), tick));
+        }
     }
 
     // --- consequences -----------------------------------------------------

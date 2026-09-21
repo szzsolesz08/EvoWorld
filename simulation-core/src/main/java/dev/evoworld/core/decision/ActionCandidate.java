@@ -1,7 +1,10 @@
 package dev.evoworld.core.decision;
 
 import dev.evoworld.core.action.Action;
+import dev.evoworld.core.intent.Intent;
+import dev.evoworld.core.world.Location;
 import java.util.Objects;
+import java.util.Optional;
 
 /**
  * An action worth considering, and what it is for.
@@ -24,6 +27,9 @@ import java.util.Objects;
  * @param stepsAway          how far off the payoff is, in moves
  * @param expectedEnergyCost energy the whole undertaking would cost, including
  *     the walk there
+ * @param target             where the undertaking heads, for candidates that
+ *     travel; what lets an agent recognise that an option carries on what it
+ *     already set out to do
  */
 public record ActionCandidate(
         Action action,
@@ -32,10 +38,12 @@ public record ActionCandidate(
         double confidence,
         int stepsAway,
         double expectedEnergyCost,
-        String rationale) {
+        String rationale,
+        Optional<Location> target) {
 
     public ActionCandidate {
         Objects.requireNonNull(action, "action");
+        Objects.requireNonNull(target, "target");
         Objects.requireNonNull(goalName, "goalName");
         Objects.requireNonNull(rationale, "rationale");
         requireFraction(expectedBenefit, "expectedBenefit");
@@ -47,6 +55,38 @@ public record ActionCandidate(
             throw new IllegalArgumentException(
                     "energy cost must not be negative, was " + expectedEnergyCost);
         }
+    }
+
+    /** A candidate that goes nowhere in particular. */
+    public ActionCandidate(
+            Action action,
+            String goalName,
+            double expectedBenefit,
+            double confidence,
+            int stepsAway,
+            double expectedEnergyCost,
+            String rationale) {
+        this(action, goalName, expectedBenefit, confidence, stepsAway, expectedEnergyCost,
+                rationale, Optional.empty());
+    }
+
+    /** A candidate that heads for {@code target}. */
+    public static ActionCandidate heading(
+            Location target,
+            Action action,
+            String goalName,
+            double expectedBenefit,
+            double confidence,
+            int stepsAway,
+            double expectedEnergyCost,
+            String rationale) {
+        return new ActionCandidate(action, goalName, expectedBenefit, confidence, stepsAway,
+                expectedEnergyCost, rationale, Optional.of(target));
+    }
+
+    /** Whether this carries on {@code intent}: the same goal, towards the same place. */
+    public boolean continues(Intent intent) {
+        return target.filter(place -> intent.isFor(goalName, place)).isPresent();
     }
 
     /** Something the agent can do right here, right now. */

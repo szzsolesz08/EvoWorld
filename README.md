@@ -6,22 +6,27 @@ things are worth by trying them, remembers where he found them, gets better at w
 does, and carries on for weeks of simulated time without anyone touching anything.
 
 ```
-[day 1 00:10] Atlas discovered first ever sight of water at (2,8)
-[day 1 05:00] Atlas learned wood hydration: 0.0 thirst per unit (0.25 sure after 1)
-[day 1 06:40] Atlas learned berries nourishment: 8.0 hunger per unit (0.25 sure after 1)
-[day 2 00:40] Atlas's gather skill is now apprentice
+[day 1 00:10] Atlas discovered first ever sight of water at (3,8)
+[day 1 19:50] Atlas learned wood nourishment: 0.0 hunger per unit (0.25 sure after 1)
+[day 1 19:50] Atlas is starving, and it is starting to hurt (health 98.5)
+[day 1 21:10] Atlas learned berries nourishment: 8.0 hunger per unit (0.25 sure after 1)
+[day 1 21:20] Atlas is no longer starving (health 86.5)
+[day 2 00:50] Atlas learned water hydration: 12.0 thirst per unit (0.25 sure after 1)
 
--- day 6 00:00 -- Atlas ------------------------------------------------
-   status     alive, age 5d 0h, health 100.0
-   location   (7,12)
-   needs      hunger 18.4, thirst 30.0, energy 73.0
-   carrying   berries 1.7
-   wants      satisfy thirst (0.09)
-   last act   MOVE to (2,8), for satisfy thirst (recalls water 10 steps north-west, 13 ticks ago)
-   remembers  berries at (6,12); found wood at (7,11); berries at (3,11); berries at (4,9)
-   knows      berries: food, 8.0 a unit (90%); water: drink, 12.0 a unit (90%), not food;
-              stone: not a drink, not food; wood: not a drink, not food
-   skills     move skilled (49% less effort), gather competent (31% less effort)
+-- day 3 00:00 -- Atlas ------------------------------------------------
+   status     alive, age 2d 0h, health 86.5
+   location   (6,5)
+   needs      hunger 11.2, thirst 28.8, energy 81.2
+   carrying   berries 3.0
+   wants      satisfy thirst (0.08)
+   last act   MOVE to (3,8), for satisfy thirst (recalls water 7 steps south-west, 11 ticks ago)
+   intent     heading for (3,8) to satisfy thirst, 6 steps to go, set out 4 ticks ago
+   remembers  found wood at (7,3); close call with hunger at (1,5); berries at (4,3);
+              berries at (10,5); found berries at (4,3)
+   knows      berries: not a drink, food, 8.0 a unit (73%);
+              water: not food, drink, 12.0 a unit (63%); stone: not food, not a drink;
+              wood: not food, not a drink
+   skills     move skilled (46% less effort), gather competent (28% less effort)
    explored   16 of 16 regions
 ```
 
@@ -69,9 +74,10 @@ and the full pipeline from perception to learning, running unattended and reprod
 | Persistence | save, load and continue, exactly, as JSON |
 | Console | events, periodic status blocks, four log levels, configurable speed |
 
-Across ten seeds, nine agents survive 2,000 ticks (83 simulated days) with no
-intervention. The tenth fails in a known, diagnosed way; see
-[Known limitations](#known-limitations).
+Across twenty seeds, every agent survives 2,000 ticks (83 simulated days) with no
+intervention, and none walks back and forth between two targets. The MVP lost seed 10
+that way; [ADR 29](docs/adr/0029-an-agent-finishes-what-it-sets-out-to-do.md) tells how
+that was fixed.
 
 ## Architecture
 
@@ -183,8 +189,11 @@ no logic of its own:
   ```
 
   Any factor at zero kills the candidate: no want, no point; no energy, no chance.
-  *Confidence* is where knowledge and memory enter. It is full for something seen, faded
-  for something remembered, and a hunch for something never tried. *Risk* projects the
+  *Confidence* is where knowledge and memory enter: how sure the agent is that the thing
+  is there, times how sure it is that the thing is worth having. The first factor is
+  full for something seen and faded for something remembered. The second is a hunch
+  until the agent has tried the thing. The same rule applies either way, so a
+  remembered bush never outscores the same bush in view. *Risk* projects the
   needs forward to when the benefit would land and charges the damage they would do by
   then.
 - **The selector** takes the best score, ties to the earlier candidate.
@@ -192,6 +201,14 @@ no logic of its own:
 Travelling needs no plan. Walking toward a spring is valued at what drinking there would
 be worth, discounted by the walk. On arrival the walk becomes impossible and the drink
 is proposed undiscounted.
+
+**Intent** keeps a trip going. Choosing to head somewhere sets the agent out on an intent:
+a goal, a place, and when it set off. The evaluator is wrapped in a
+`CommitmentEvaluator` that scores any option carrying the trip on 1.3× higher, so a
+near-tie does not turn the agent round. A rest or a meal on the way is a pause, not a
+change of mind. The intent ends on arrival, or when the trip has taken three times as
+long as it should. The bonus multiplies, so a trip whose goal is no longer wanted still
+scores nothing.
 
 `ActionEvaluator`, `ActionSelector` and `DecisionMaker` are interfaces. A learned scorer,
 an exploration-sampling selector or a planner can replace any of them without touching
@@ -350,15 +367,15 @@ seen.
 ## Testing
 
 ```bash
-./gradlew test     # all modules, 467 tests
+./gradlew test     # all modules, 491 tests
 ./gradlew build    # compile, test and assemble
 ```
 
 | Module | Tests | What they cover |
 | --- | --- | --- |
-| core | 417 | every rule, action, goal, proposer and learner; memory, knowledge, exploration, skills; long-run integration; save and continue |
+| core | 440 | every rule, action, goal, proposer and learner; memory, knowledge, exploration, skills; intent and commitment; long-run integration; save and continue |
 | persistence | 14 | JSON round trips, save-to-file-and-continue, byte stability, strict reading, atomic writes |
-| runner | 36 | options, status report, log levels, autosave, pacing, scripted runs |
+| runner | 37 | options, status report, log levels, autosave, pacing, scripted runs |
 
 Tests assert behaviour, not arithmetic, wherever they can: "a desperate agent does not
 stop to taste a rock", "having learned stone is not food, it stops trying to eat stone".
@@ -369,8 +386,15 @@ The integration tests worth knowing about:
   every invariant on **every tick**. It asserts that needs stay in range, nothing leaves
   the map, no bag or bush overfills, the dead stay dead, and memory stays bounded. It also
   checks that the agent survives, forages, drinks, rests, explores, learns the right
-  values and improves, and that it never repeats a lesson it has been taught.
-- **`SaveAndContinueTest`** and **`SaveFileTest`** save at nine points, including mid-job,
+  values and improves, and that it never repeats a lesson it has been taught. It fails
+  any run where the agent walks back and forth between two places, and it holds seed 10,
+  the MVP's one death, to a full 2,000 hourly ticks.
+- **`DitheringTest`** sets up the scene seed 10 died in, two bushes with one just out
+  of sight, and requires every step to bring the agent closer to the bush it chooses. It
+  also tests each of the two faults behind the old oscillation on its own. The MVP fails
+  all three tests.
+- **`SaveAndContinueTest`** and **`SaveFileTest`** save at nine points, including mid-job
+  and mid-journey,
   through memory and through real JSON files, and require the continuation to be
   identical to a run that never stopped. That includes a ten-leg relay of save and
   reload.
@@ -383,11 +407,10 @@ HTML reports are written to `<module>/build/reports/tests/test/index.html`.
 
 Honest ones, most important first.
 
-- **Dithering.** Decisions are made fresh every tick with no commitment to a plan. When
-  two targets in opposite directions score almost the same, each step toward one makes
-  the other the nearer target, and the agent oscillates between them until it starves.
-  This is the one failure mode left across ten seeds (seed 10 dies of it; seed 5 survives
-  it narrowly). Persistent intent is the fix.
+- **The first day is the dangerous one.** A newborn agent does not know berries are food
+  until it tries them, and in the default run it goes hungry enough to lose some health
+  before it does. Once it has learned, it stays out of danger: across 20 seeds × 2,000
+  hourly ticks, no need does any damage at all.
 - **No healing.** Health lost is lost for good. An agent that survives a close call
   carries the damage for the rest of the run, which makes the next one more dangerous.
 - **Greedy, one step at a time.** The agent scores the next action, never a sequence.
@@ -405,7 +428,7 @@ Honest ones, most important first.
 - **Hydration is read against the gulp asked for, not the gulp received**, so a spring
   with less than a gulp left would read low. Springs refill fast enough that it has not
   shown up in practice.
-- **Save format version 1 has no migration path.** A save from a different format version
+- **Save format version 2 has no migration path.** A save from a different format version
   is refused rather than converted. Scripted runs cannot be saved at all.
 - **After loading, the status block shows "(not decided yet)"** until the agent's next
   decision. The latest want and decision exist only for display and are not saved.
@@ -414,24 +437,21 @@ Honest ones, most important first.
 
 Roughly in the order they would pay off:
 
-1. **Persistent intent.** Commit to a target across ticks and re-plan only when something
-   changes. This fixes dithering, and exploration would head somewhere instead of
-   re-scoring every step.
-2. **Healing and a health goal**, so a close call can be recovered from, and recovering
+1. **Healing and a health goal**, so a close call can be recovered from, and recovering
    becomes something an agent chooses to spend time on.
-3. **Learning about actions, not just things.** Feed outcomes back into the evaluator's
+2. **Learning about actions, not just things.** Feed outcomes back into the evaluator's
    weights, so an agent that keeps finding a place empty stops walking to it. The
    `ActionEvaluator` seam exists for this.
-4. **A richer world:** terrain that affects movement, day and night, weather, seasons, and
+3. **A richer world:** terrain that affects movement, day and night, weather, seasons, and
    larger or procedurally generated maps.
-5. **Uses for wood and stone:** crafting or building, giving gathering a purpose beyond
+4. **Uses for wood and stone:** crafting or building, giving gathering a purpose beyond
    food and the inventory a real trade-off.
-6. **More agents**, then what they need: noticing each other, competing for a bush,
+5. **More agents**, then what they need: noticing each other, competing for a bush,
    eventually sharing knowledge.
-7. **A graphical viewer** as another observer, for example with LibGDX. The core needs no
+6. **A graphical viewer** as another observer, for example with LibGDX. The core needs no
    changes for it: everything a viewer would draw already arrives as immutable snapshots
    and events.
-8. **Save migrations**, so older saves can be carried forward rather than refused.
+7. **Save migrations**, so older saves can be carried forward rather than refused.
 
 ## Technology
 

@@ -59,7 +59,7 @@ public final class ApproachResourceProposer implements ActionProposer {
                         ExpectedRelief.fromDrinking(
                                 knowledge, needs, seen.type(),
                                 Math.min(drinkGulp, seen.quantity())),
-                        knowledge.confidence(BeliefKind.HYDRATION, seen.type())));
+                        UntestedGuess.worthIt(knowledge, BeliefKind.HYDRATION, seen.type())));
             }
             if (needs.hunger() > Needs.MIN
                     && ExpectedRelief.thinksItIsFood(knowledge, seen.type())) {
@@ -69,22 +69,23 @@ public final class ApproachResourceProposer implements ActionProposer {
                         ExpectedRelief.fromEating(
                                 knowledge, needs, seen.type(),
                                 Math.min(eatPortion, seen.quantity())),
-                        knowledge.confidence(BeliefKind.NOURISHMENT, seen.type())));
+                        UntestedGuess.worthIt(knowledge, BeliefKind.NOURISHMENT, seen.type())));
             }
         }
         return List.copyOf(candidates);
     }
 
     private ActionCandidate approach(
-            PerceivedResource target, String goal, double benefit, double believed) {
+            PerceivedResource target, String goal, double benefit, double worthIt) {
         int steps = target.stepsAway();
-        return new ActionCandidate(
+        return ActionCandidate.heading(
+                target.location(),
                 new MoveAction(target.location(), moveEnergyCost),
                 goal,
                 benefit,
                 // Sure it is there - it can see it. Only as sure as experience
                 // allows that going there is worth the walk.
-                Math.max(believed, UntestedGuess.CONFIDENCE),
+                worthIt,
                 steps,
                 steps * moveEnergyCost,
                 String.format(

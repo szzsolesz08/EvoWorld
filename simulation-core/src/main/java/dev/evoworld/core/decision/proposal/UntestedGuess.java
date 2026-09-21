@@ -1,5 +1,9 @@
 package dev.evoworld.core.decision.proposal;
 
+import dev.evoworld.core.knowledge.BeliefKind;
+import dev.evoworld.core.knowledge.Knowledge;
+import dev.evoworld.core.resource.ResourceType;
+
 /**
  * How much weight an agent gives a hunch it has never tested.
  *
@@ -19,6 +23,20 @@ final class UntestedGuess {
 
     /** What a complete guess is worth next to a certainty. */
     static final double CONFIDENCE = ExploreProposer.SPECULATIVE;
+
+    /**
+     * How sure an agent is that a thing is worth having for {@code kind},
+     * never less than a guess.
+     *
+     * <p>Every proposer that offers a thing for what it does charges this
+     * doubt, whether the thing is in sight or remembered. When only the ones
+     * in sight did, a bush out of sight scored higher than an identical bush in
+     * view, and an agent between two walked back and forth, each step putting
+     * the other one out of sight.
+     */
+    static double worthIt(Knowledge knowledge, BeliefKind kind, ResourceType type) {
+        return Math.max(knowledge.confidence(kind, type), CONFIDENCE);
+    }
 
     private UntestedGuess() {
     }

@@ -4,6 +4,7 @@ import dev.evoworld.core.Simulation;
 import dev.evoworld.core.agent.Needs;
 import dev.evoworld.core.decision.Decision;
 import dev.evoworld.core.goal.GoalPriority;
+import dev.evoworld.core.intent.Intent;
 import dev.evoworld.core.knowledge.Belief;
 import dev.evoworld.core.memory.Memory;
 import dev.evoworld.core.memory.Recollection;
@@ -11,6 +12,7 @@ import dev.evoworld.core.observer.SimulationObserver;
 import dev.evoworld.core.skill.Skills;
 import dev.evoworld.core.status.AgentStatus;
 import dev.evoworld.core.world.AgentSnapshot;
+import dev.evoworld.core.world.Location;
 import dev.evoworld.core.world.WorldState;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -38,6 +40,7 @@ import org.slf4j.LoggerFactory;
  *    carrying   berries 5.0
  *    wants      satisfy thirst (0.09)
  *    last act   MOVE to (2,8), for satisfy thirst (water 3 steps north)
+ *    intent     heading for (2,8) to satisfy thirst, 3 steps to go, set out 4 ticks ago
  *    remembers  water at (2,8); found stone at (13,1); close call with thirst at (7,3)
  *    knows      berries: food, 8.0 a unit (98%); stone: not food, not a drink
  *    skills     move skilled (49% less effort), gather competent (35% less effort)
@@ -118,6 +121,9 @@ public final class StatusReport implements SimulationObserver {
             row(lines, status.busyFor() > 0 ? "doing" : "last act", status.doing()
                     .map(decision -> describe(decision, status.busyFor()))
                     .orElse("(not decided yet)"));
+            row(lines, "intent", body.intent()
+                    .map(intent -> describe(intent, body.location(), status.time().tick()))
+                    .orElse("nowhere in particular"));
         }
         row(lines, "remembers", status.memories().isEmpty()
                 ? "nothing worth mentioning"
@@ -128,6 +134,15 @@ public final class StatusReport implements SimulationObserver {
         row(lines, "skills", describe(status.skills()));
         row(lines, "explored", status.regionsVisited() + " of " + status.regionCount() + " regions");
         return lines;
+    }
+
+    private static String describe(Intent intent, Location from, long now) {
+        return String.format(
+                Locale.ROOT,
+                "%s, %d steps to go, set out %d ticks ago",
+                intent.describe(),
+                from.manhattanDistanceTo(intent.target()),
+                intent.ticksUnderway(now));
     }
 
     private static void row(List<String> lines, String label, String value) {

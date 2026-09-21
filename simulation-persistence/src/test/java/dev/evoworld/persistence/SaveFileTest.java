@@ -125,7 +125,7 @@ class SaveFileTest {
         String json = Files.readString(file);
 
         for (String field : List.of(
-                "\"formatVersion\" : 1", "\"name\" : \"Atlas\"", "\"beliefs\"",
+                "\"formatVersion\" : " + SavedSimulation.FORMAT_VERSION, "\"name\" : \"Atlas\"", "\"beliefs\"",
                 "\"memories\"", "\"explored\"", "\"randomState\"", "\"tickDuration\" : \"PT10M\"")) {
             assertTrue(json.contains(field), "expected " + field + " in the save");
         }

@@ -69,7 +69,7 @@ public final class UtilityEvaluator implements ActionEvaluator {
 
         double utility = want * benefit * confidence * timeliness * affordability * (1.0 - risk);
 
-        return new Decision(candidate.action(), utility, explain(candidate, want, benefit, risk));
+        return Decision.of(candidate, utility, explain(candidate, want, benefit, risk));
     }
 
     /** Worth less the longer the payoff takes to arrive. */

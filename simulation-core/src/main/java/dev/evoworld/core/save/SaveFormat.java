@@ -19,6 +19,7 @@ import dev.evoworld.core.agent.Needs;
 import dev.evoworld.core.event.SimulationEvent.Danger;
 import dev.evoworld.core.exploration.ExplorationMap;
 import dev.evoworld.core.exploration.Region;
+import dev.evoworld.core.intent.Intent;
 import dev.evoworld.core.knowledge.Belief;
 import dev.evoworld.core.knowledge.Knowledge;
 import dev.evoworld.core.memory.Memory;
@@ -33,6 +34,7 @@ import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * Translates between the domain and the save format, in both directions.
@@ -171,7 +173,15 @@ public final class SaveFormat {
                 underway == null ? null : save(underway),
                 underwayTicksRemaining,
                 lastActivity,
-                dangers);
+                dangers,
+                agent.intent()
+                        .map(intent -> new SavedIntent(
+                                intent.goalName(),
+                                intent.target().x(),
+                                intent.target().y(),
+                                intent.formedAtTick(),
+                                intent.startingDistance()))
+                        .orElse(null));
     }
 
     /** The agent itself; what the simulation held for it is read by the simulation. */
@@ -211,7 +221,13 @@ public final class SaveFormat {
                 knowledge,
                 Skills.of(practice),
                 memory,
-                exploration);
+                exploration,
+                Optional.ofNullable(saved.intent())
+                        .map(intent -> new Intent(
+                                intent.goalName(),
+                                new Location(intent.x(), intent.y()),
+                                intent.formedAtTick(),
+                                intent.startingDistance())));
     }
 
     // --- memories ---------------------------------------------------------

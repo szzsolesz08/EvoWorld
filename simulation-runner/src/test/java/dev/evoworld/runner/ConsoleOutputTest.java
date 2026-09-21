@@ -91,6 +91,28 @@ class ConsoleOutputTest {
         }
 
         @Test
+        @DisplayName("says where the agent is heading while it has somewhere to be, and not otherwise")
+        void showsTheIntent() {
+            Simulation simulation = EvoWorldRunner.buildSimulation(SimulationConfig.defaults(7L));
+            boolean sawHeading = false;
+            boolean sawNowhere = false;
+            for (int tick = 0; tick < 900 && !(sawHeading && sawNowhere); tick++) {
+                simulation.run(1);
+                AgentStatus status = simulation.status().get(0);
+                String intent = row(
+                        StatusReport.lines(status, simulation.config().tickDuration()), "intent");
+                if (status.body().intent().isPresent()) {
+                    sawHeading = true;
+                    assertTrue(intent.contains("heading for ") && intent.contains("steps to go"), intent);
+                } else {
+                    sawNowhere = true;
+                    assertTrue(intent.contains("nowhere in particular"), intent);
+                }
+            }
+            assertTrue(sawHeading && sawNowhere, "the run should both travel and stay put");
+        }
+
+        @Test
         @DisplayName("asking for a status changes nothing about the run")
         void reportingIsReadOnly() {
             Simulation watched = EvoWorldRunner.buildSimulation(SimulationConfig.defaults(7L));

@@ -23,9 +23,11 @@ import dev.evoworld.core.observer.SimulationObserver;
 import dev.evoworld.core.resource.ResourceSnapshot;
 import dev.evoworld.core.resource.ResourceType;
 import dev.evoworld.core.world.AgentSnapshot;
+import dev.evoworld.core.world.Location;
 import dev.evoworld.core.world.World;
 import dev.evoworld.core.world.WorldGenerator;
 import dev.evoworld.core.world.WorldState;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -71,6 +73,11 @@ class AutonomousSimulationTest {
         private AgentSnapshot atDeath;
         private int resourceCount = -1;
         private Action lastChosen;
+        private final List<Location> path = new ArrayList<>();
+        private int turnsInARow;
+        private long lastStepTick = -1;
+        int longestDithering;
+        String ditheringSeen = "";
 
         Auditor(Agent agent) {
             this.agent = agent;
@@ -151,6 +158,41 @@ class AutonomousSimulationTest {
                 check(snapshot.ticksAlive() == tick, tick,
                         "age " + snapshot.ticksAlive() + " is not the ticks lived");
             }
+            checkIntent(snapshot, state, tick);
+            followPath(snapshot, tick);
+        }
+
+        private void checkIntent(AgentSnapshot snapshot, WorldState state, long tick) {
+            check(snapshot.alive() || snapshot.intent().isEmpty(), tick, "the dead still intend");
+            snapshot.intent().ifPresent(intent -> {
+                check(state.bounds().contains(intent.target()), tick, "heading off the map " + intent);
+                check(intent.formedAtTick() <= tick, tick, "an intent from the future " + intent);
+                check(!intent.isReachedFrom(snapshot.location()), tick, "still heading for where it is " + intent);
+            });
+        }
+
+        /**
+         * Counts steps that undo the step before - A to B, then on the very
+         * next tick straight back to A. One is a change of mind; several in a
+         * row is dithering. Stepping back to gather from a bush just passed,
+         * then carrying on, has work in between and is neither.
+         */
+        private void followPath(AgentSnapshot snapshot, long tick) {
+            Location here = snapshot.location();
+            if (!path.isEmpty() && path.get(path.size() - 1).equals(here)) {
+                return;
+            }
+            boolean turnedBack = path.size() >= 2
+                    && path.get(path.size() - 2).equals(here)
+                    && lastStepTick == tick - 1;
+            turnsInARow = turnedBack ? turnsInARow + 1 : 0;
+            lastStepTick = tick;
+            path.add(here);
+            if (turnsInARow > longestDithering) {
+                longestDithering = turnsInARow;
+                ditheringSeen = "t" + snapshot.ticksAlive() + " "
+                        + path.subList(Math.max(0, path.size() - 6), path.size());
+            }
         }
 
         private void checkMind(long tick) {
@@ -183,7 +225,10 @@ class AutonomousSimulationTest {
     }
 
     private Run runAutonomously(long seed, long ticks) {
-        SimulationConfig config = SimulationConfig.defaults(seed);
+        return runAutonomously(SimulationConfig.defaults(seed), ticks);
+    }
+
+    private Run runAutonomously(SimulationConfig config, long ticks) {
         World world = WorldGenerator.generate(config);
         Agent agent = Agent.spawn("agent-1", "Atlas", config.bounds().center());
         world.addAgent(agent);
@@ -204,6 +249,9 @@ class AutonomousSimulationTest {
         Run run = runAutonomously(seed, LONG_RUN);
 
         assertEquals(List.of(), run.auditor().violations, "invariants broken for seed " + seed);
+        assertTrue(run.auditor().longestDithering < 2,
+                "walked back and forth " + run.auditor().longestDithering + " times in a row: "
+                        + run.auditor().ditheringSeen);
         assertTrue(run.ticksRun() > 0);
         assertTrue(
                 run.ticksRun() == LONG_RUN || !run.simulation().anyoneAlive(),
@@ -222,6 +270,24 @@ class AutonomousSimulationTest {
         assertEquals(first.simulation().snapshot(), second.simulation().snapshot());
         assertEquals(first.agent().knowledge(), second.agent().knowledge());
         assertEquals(first.agent().skills(), second.agent().skills());
+    }
+
+    @Test
+    @DisplayName("seed 10, which starved dithering between two bushes, now lives out the run")
+    void noLongerStarvesBetweenTwoBushes() {
+        // The MVP's one known death: at t300 Atlas stood between two berry
+        // bushes, turning back towards whichever was out of sight, and died of
+        // hunger at t358.
+        Run run = runAutonomously(
+                SimulationConfig.defaults(10L).withTickDuration(Duration.ofMinutes(60)),
+                2000L);
+
+        assertTrue(run.agent().isAlive(), "died after " + run.agent().ticksAlive() + " ticks");
+        assertEquals(2000L, run.ticksRun());
+        assertEquals(List.of(), run.auditor().violations);
+        assertTrue(run.auditor().longestDithering < 2,
+                "walked back and forth " + run.auditor().longestDithering + " times in a row: "
+                        + run.auditor().ditheringSeen);
     }
 
     // --- capability -------------------------------------------------------

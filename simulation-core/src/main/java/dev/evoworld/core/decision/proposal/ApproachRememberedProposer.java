@@ -59,6 +59,7 @@ public final class ApproachRememberedProposer implements ActionProposer {
                         place,
                         SatisfyThirstGoal.NAME,
                         ExpectedRelief.fromDrinking(knowledge, needs, place.type(), drinkGulp),
+                        UntestedGuess.worthIt(knowledge, BeliefKind.HYDRATION, place.type()),
                         knowledge));
             }
             if (needs.hunger() > Needs.MIN
@@ -67,6 +68,7 @@ public final class ApproachRememberedProposer implements ActionProposer {
                         place,
                         SatisfyHungerGoal.NAME,
                         ExpectedRelief.fromEating(knowledge, needs, place.type(), eatPortion),
+                        UntestedGuess.worthIt(knowledge, BeliefKind.NOURISHMENT, place.type()),
                         knowledge));
             }
         }
@@ -74,17 +76,23 @@ public final class ApproachRememberedProposer implements ActionProposer {
     }
 
     private ActionCandidate head(
-            RememberedResource place, String goal, double benefit, Knowledge knowledge) {
+            RememberedResource place,
+            String goal,
+            double benefit,
+            double worthIt,
+            Knowledge knowledge) {
         int steps = place.stepsAway();
-        // Two doubts compound: how well the agent remembers the place, and how
-        // often places of this kind turn out to still have anything in them.
+        // Three doubts compound: how well the agent remembers the place, how
+        // often places of this kind turn out to still have anything in them,
+        // and - as for anything in sight - whether it is worth having at all.
         double reliability =
                 knowledge.estimate(BeliefKind.LOCATION_RELIABILITY, place.type());
-        return new ActionCandidate(
+        return ActionCandidate.heading(
+                place.location(),
                 new MoveAction(place.location(), moveEnergyCost),
                 goal,
                 benefit,
-                clampToFraction(place.confidence() * reliability),
+                clampToFraction(place.confidence() * reliability * worthIt),
                 steps,
                 steps * moveEnergyCost,
                 String.format(

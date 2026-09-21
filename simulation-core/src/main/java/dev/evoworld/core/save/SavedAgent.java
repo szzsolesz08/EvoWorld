@@ -21,6 +21,7 @@ import java.util.Objects;
  *     tick will charge it for
  * @param dangers which needs were already doing damage, so the next tick does
  *     not report them as starting again
+ * @param intent where it had set out for, or null
  */
 public record SavedAgent(
         String id,
@@ -43,7 +44,8 @@ public record SavedAgent(
         SavedAction underway,
         long underwayTicksRemaining,
         ActivityLevel lastActivity,
-        List<Danger> dangers) {
+        List<Danger> dangers,
+        SavedIntent intent) {
 
     public SavedAgent {
         Objects.requireNonNull(id, "id");

@@ -75,7 +75,7 @@ public final class DeliberativeDecisionMaker implements DecisionMaker {
                         new DiscardProposer(actions.gatherAmount()),
                         new RestProposer(actions.restEnergyGain()),
                         new ExploreProposer(actions.moveEnergyCost())),
-                new UtilityEvaluator(config.metabolism()),
+                new CommitmentEvaluator(new UtilityEvaluator(config.metabolism())),
                 new HighestUtilitySelector(),
                 actions.restEnergyGain());
     }
