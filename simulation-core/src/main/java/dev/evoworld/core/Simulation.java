@@ -119,6 +119,9 @@ public final class Simulation {
 
     private boolean announced;
 
+    /** Whether {@link #start()} has been called; not saved, it only guards the call. */
+    private boolean steppingStarted;
+
     public Simulation(World world, DecisionMaker decisionMaker, SimulationConfig config) {
         this(
                 world,
@@ -196,8 +199,7 @@ public final class Simulation {
         if (ticks < 0) {
             throw new IllegalArgumentException("ticks must not be negative, was " + ticks);
         }
-        notifyAll(observer -> observer.onSimulationStarted(snapshot()));
-        announceArrivals();
+        begin();
         log.info("simulation started seed={} ticks={} world={} resources={} tickDuration={}",
                 config.seed(), ticks, world.bounds(), world.resources().size(),
                 config.tickDuration());
@@ -219,6 +221,27 @@ public final class Simulation {
         String stopReason = reason;
         notifyAll(observer -> observer.onSimulationStopped(finalState, stopReason));
         return processed;
+    }
+
+    /**
+     * Gets a simulation ready to be stepped by hand, one {@link #tick()} at a
+     * time, the way a live viewer drives it.
+     *
+     * <p>Does what {@link #run} does before its first tick: tells observers the
+     * run has started and announces who is in the world. Only the first call
+     * does anything, so a viewer may call it without keeping track.
+     */
+    public void start() {
+        if (steppingStarted) {
+            return;
+        }
+        steppingStarted = true;
+        begin();
+    }
+
+    private void begin() {
+        notifyAll(observer -> observer.onSimulationStarted(snapshot()));
+        announceArrivals();
     }
 
     // --- status -----------------------------------------------------------

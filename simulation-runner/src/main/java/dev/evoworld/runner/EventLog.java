@@ -76,7 +76,7 @@ public final class EventLog implements SimulationObserver {
     }
 
     /** "day 3 14:20" - in-world time, counted from the first day. */
-    static String when(SimulationTime time) {
+    public static String when(SimulationTime time) {
         Duration elapsed = time.elapsed();
         return String.format(
                 Locale.ROOT,

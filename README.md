@@ -1,7 +1,7 @@
 # EvoWorld
 
-A headless, autonomous life simulation. You are not the player. You start a world and
-watch an agent, Atlas, live in it: he explores, finds food and water, works out what
+An autonomous life simulation, with a window to watch it in. You are not the player. You
+start a world and watch an agent, Atlas, live in it: he explores, finds food and water, works out what
 things are worth by trying them, remembers where he found them, gets better at what he
 does, and carries on for weeks of simulated time without anyone touching anything.
 
@@ -84,12 +84,14 @@ that was fixed.
 ```
 simulation-core          the simulation: world, agents, minds, the tick loop. No I/O, no rendering.
 simulation-persistence   JSON save files, via Jackson. Depends on the core.
-simulation-runner        the headless command-line application. Depends on both.
+simulation-runner        the headless command-line application and the survey. Depends on both.
+simulation-viewer        a LibGDX window that plays a run live. Depends on all three.
 ```
 
 The core depends on SLF4J and nothing else. Jackson appears only in the persistence
-module, and Logback only in the runner. A graphical viewer would be a fourth module
-depending on the core, and the core would not need to change for it.
+module, Logback only in the runner, and LibGDX only in the viewer. The viewer is one more
+observer: it reads the same immutable values the console prints, and the core has no
+rendering code.
 
 Four properties the design protects, each enforced by tests rather than by convention:
 
@@ -107,7 +109,7 @@ Four properties the design protects, each enforced by tests rather than by conve
 - **Everything is explainable.** Every decision carries its reasons, every memory its
   timestamp and confidence, every belief the count behind it.
 
-The reasoning behind each significant decision is recorded in [docs/adr](docs/adr), 28
+The reasoning behind each significant decision is recorded in [docs/adr](docs/adr), 32
 records in all. They include the ones where a first attempt was wrong.
 
 ## The simulation loop
@@ -314,6 +316,36 @@ Three design choices make exactness possible
 
 Saves are readable JSON, around 19 KB for a 20-day run.
 
+## Watching it
+
+```bash
+./gradlew view                                      # seed 42, 4 ticks a second
+./gradlew view "--args=--seed 10"                   # another world
+./gradlew view "--args=--scenario wounded"          # watch him heal
+./gradlew view "--args=--load saves/atlas.json"     # carry on a saved run
+```
+
+![The viewer: the map on the left, Atlas's state on the right, recent events below](docs/viewer.png)
+
+The map shows resources as squares that shrink as they are used up: water blue, berries
+red, wood brown, stone grey. Atlas is the yellow disc. The lighter tiles are what he can
+see, and the thin line runs to where he is heading. The panel shows his body, what he
+wants, what he just did and why, and what he knows. The newest events are at the bottom.
+When he dies, the run stops and says what killed him.
+
+| Key | Does |
+| --- | --- |
+| `Space` | pause and resume |
+| `Right` | one tick, while paused |
+| `+` / `-` | faster or slower: 1, 2, 4, 8, 15, 30, 60 or 120 ticks a second |
+| `S` | save to `saves/viewer.json`; the console's `--load` can carry it on |
+| `Esc` | quit |
+
+Other options: `--tick-minutes <n>`, `--speed <ticks per second>`, and
+`--screenshot <file> --after <ticks>`, which saves one frame as a PNG and quits (that's
+how the picture above was made). The terminal keeps a quiet narration of the key moments
+while the window is open.
+
 ## Running it
 
 Requires JDK 21 or newer. No Gradle install is needed; use the wrapper.
@@ -418,15 +450,16 @@ the change did.
 ## Testing
 
 ```bash
-./gradlew test     # all modules, 541 tests
+./gradlew test     # all modules, 559 tests
 ./gradlew build    # compile, test and assemble
 ```
 
 | Module | Tests | What they cover |
 | --- | --- | --- |
-| core | 467 | every rule, action, goal, proposer and learner; memory, knowledge, exploration, skills; intent and commitment; healing; long-run integration; save and continue |
+| core | 468 | every rule, action, goal, proposer and learner; memory, knowledge, exploration, skills; intent and commitment; healing; long-run integration; save and continue |
 | persistence | 14 | JSON round trips, save-to-file-and-continue, byte stability, strict reading, atomic writes |
 | runner | 60 | options, status report, log levels, autosave, pacing, scripted runs; the survey's scenarios, measurements and determinism |
+| viewer | 17 | pacing, pausing and stepping, the feed, screen layout, options; a watched run is the same run as an unwatched one |
 
 Tests assert behaviour, not arithmetic, wherever they can: "a desperate agent does not
 stop to taste a rock", "having learned stone is not food, it stops trying to eat stone".
@@ -500,10 +533,7 @@ Roughly in the order they would pay off:
    food and the inventory a real trade-off.
 4. **More agents**, then what they need: noticing each other, competing for a bush,
    eventually sharing knowledge.
-5. **A graphical viewer** as another observer, for example with LibGDX. The core needs no
-   changes for it: everything a viewer would draw already arrives as immutable snapshots
-   and events.
-6. **Save migrations**, so older saves can be carried forward rather than refused.
+5. **Save migrations**, so older saves can be carried forward rather than refused.
 
 ## Technology
 

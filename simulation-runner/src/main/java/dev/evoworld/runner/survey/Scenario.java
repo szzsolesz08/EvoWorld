@@ -105,7 +105,14 @@ public record Scenario(
      * build, apart from what this scenario changes.
      */
     public Simulation build(long seed) {
-        SimulationConfig chosen = config.apply(seed);
+        return build(config.apply(seed));
+    }
+
+    /**
+     * The run for a configuration derived from this scenario's, such as the
+     * viewer's with a different tick length.
+     */
+    public Simulation build(SimulationConfig chosen) {
         World world = WorldGenerator.generate(chosen, resources);
         world.addAgent(new Agent(
                 AgentId.of("agent-1"),

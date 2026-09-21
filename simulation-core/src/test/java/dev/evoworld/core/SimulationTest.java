@@ -333,4 +333,38 @@ class SimulationTest {
             stopped++;
         }
     }
+
+    @Test
+    @DisplayName("start() readies a run for stepping by hand: once, and to the same effect as run()")
+    void startingByHand() {
+        World world = WorldGenerator.generate(CONFIG);
+        world.addAgent(Agent.spawn("agent-1", "Atlas", CONFIG.bounds().center()));
+        Simulation stepped = new Simulation(world, DeliberativeDecisionMaker.from(CONFIG), CONFIG);
+        List<String> heard = new ArrayList<>();
+        stepped.addObserver(new SimulationObserver() {
+            @Override
+            public void onSimulationStarted(WorldState state) {
+                heard.add("started");
+            }
+
+            @Override
+            public void onEvent(dev.evoworld.core.event.SimulationEvent event) {
+                heard.add(event.getClass().getSimpleName());
+            }
+        });
+
+        stepped.start();
+        stepped.start();
+        for (int i = 0; i < 50; i++) {
+            stepped.tick();
+        }
+
+        assertEquals(List.of("started", "Born"), heard.subList(0, 2));
+        assertEquals(1L, heard.stream().filter("started"::equals).count(), "only the first start counts");
+        World same = WorldGenerator.generate(CONFIG);
+        same.addAgent(Agent.spawn("agent-1", "Atlas", CONFIG.bounds().center()));
+        Simulation ran = new Simulation(same, DeliberativeDecisionMaker.from(CONFIG), CONFIG);
+        ran.run(50);
+        assertEquals(ran.save(), stepped.save());
+    }
 }

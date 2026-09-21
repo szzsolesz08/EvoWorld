@@ -3,6 +3,7 @@ jackson = "2.22.2"
 slf4j = "2.0.19"
 logback = "1.5.38"
 junit = "5.14.4"
+gdx = "1.14.2"
 
 [libraries]
 jackson-databind = { module = "com.fasterxml.jackson.core:jackson-databind", version.ref = "jackson" }
@@ -11,3 +12,6 @@ logback-classic = { module = "ch.qos.logback:logback-classic", version.ref = "lo
 junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
 junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
 junit-platform-launcher = { module = "org.junit.platform:junit-platform-launcher" }
+gdx-core = { module = "com.badlogicgames.gdx:gdx", version.ref = "gdx" }
+gdx-backend-lwjgl3 = { module = "com.badlogicgames.gdx:gdx-backend-lwjgl3", version.ref = "gdx" }
+gdx-platform = { module = "com.badlogicgames.gdx:gdx-platform", version.ref = "gdx" }
