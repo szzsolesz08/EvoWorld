@@ -11,6 +11,8 @@ import dev.evoworld.core.decision.proposal.DrinkProposer;
 import dev.evoworld.core.decision.proposal.EatProposer;
 import dev.evoworld.core.decision.proposal.ExploreProposer;
 import dev.evoworld.core.decision.proposal.GatherProposer;
+import dev.evoworld.core.decision.proposal.GoLookingProposer;
+import dev.evoworld.core.decision.proposal.HeadForPlentyProposer;
 import dev.evoworld.core.decision.proposal.InvestigateProposer;
 import dev.evoworld.core.decision.proposal.RestProposer;
 import dev.evoworld.core.decision.proposal.SleepProposer;
@@ -75,11 +77,15 @@ public final class DeliberativeDecisionMaker implements DecisionMaker {
                                 actions.gatherAmount(), actions.gatherEnergyCost(), actions.gatherTicks(tick)),
                         new ApproachResourceProposer(actions.moveEnergyCost(), steps, actions.gatherTicks(tick)),
                         new ApproachRememberedProposer(actions.moveEnergyCost(), steps, actions.gatherTicks(tick)),
-                        new InvestigateProposer(actions.eatPortion()),
+                        new HeadForPlentyProposer(
+                                actions.moveEnergyCost(), steps, actions.gatherTicks(tick)),
+                        new InvestigateProposer(actions.eatPortion(), actions.moveEnergyCost(), steps),
                         new DiscardProposer(actions.gatherAmount()),
                         new RestProposer(body),
                         new SleepProposer(body, nightTicks),
-                        new ExploreProposer(actions.moveEnergyCost(), steps)),
+                        new ExploreProposer(actions.moveEnergyCost(), steps),
+                        new GoLookingProposer(
+                                actions.moveEnergyCost(), steps, actions.gatherTicks(tick))),
                 new CommitmentEvaluator(new UtilityEvaluator(body)),
                 new HighestUtilitySelector());
     }

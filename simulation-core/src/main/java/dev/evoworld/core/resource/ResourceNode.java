@@ -114,10 +114,22 @@ public final class ResourceNode {
      * recover - a picked bush grows its berries back.
      */
     public void regenerate(Duration tick) {
-        if (!type.isRenewable()) {
+        regenerate(tick, 1L);
+    }
+
+    /**
+     * Several ticks of regrowth at once, for ground nobody has been near.
+     *
+     * <p>Regrowth is a flat rate up to capacity, so a hundred ticks applied
+     * together come to exactly what a hundred ticks applied one at a time
+     * would - which is what lets a world leave distant chunks alone until
+     * somebody walks back into them.
+     */
+    public void regenerate(Duration tick, long ticks) {
+        if (!type.isRenewable() || ticks <= 0L) {
             return;
         }
-        quantity = Math.min(capacity, quantity + type.regenPerTick(tick));
+        quantity = Math.min(capacity, quantity + type.regenPerTick(tick) * ticks);
     }
 
     public ResourceSnapshot snapshot() {

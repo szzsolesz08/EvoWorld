@@ -27,8 +27,11 @@ import dev.evoworld.core.perception.PerceptionSystem;
 import dev.evoworld.core.random.SimulationRandom;
 import dev.evoworld.core.resource.ResourceNode;
 import dev.evoworld.core.resource.ResourceType;
+import dev.evoworld.core.world.Chunk;
+import dev.evoworld.core.world.ChunkMix;
 import dev.evoworld.core.world.Location;
 import dev.evoworld.core.world.World;
+import dev.evoworld.core.world.WorldBounds;
 import dev.evoworld.core.world.WorldGenerator;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -46,7 +49,13 @@ import org.junit.jupiter.api.Test;
  */
 class DiscoveryTest {
 
-    private static final SimulationConfig CONFIG = SimulationConfig.defaults(1L);
+    /**
+     * A world with edges, built by hand: these tests put one bush and one
+     * spring somewhere and watch what the agent makes of them, which only says
+     * anything if the agent cannot simply walk away into open country.
+     */
+    private static final SimulationConfig CONFIG =
+            SimulationConfig.defaults(1L).withWorld(WorldBounds.of(16, 16), ChunkMix.standard());
     private static final Location HERE = new Location(8, 8);
     private static final SimulationTime NOW = new SimulationTime(1L, Duration.ofMinutes(10));
 
@@ -167,7 +176,7 @@ class DiscoveryTest {
                     1,
                     journal.discoveries.stream()
                             .filter(found -> found.what() == ResourceType.WATER)
-                            .filter(found -> found.region().equals(Region.containing(new Location(9, 8))))
+                            .filter(found -> found.chunk().equals(Chunk.containing(new Location(9, 8))))
                             .count());
         }
     }
@@ -288,7 +297,7 @@ class DiscoveryTest {
     class Exploration {
 
         @Test
-        @DisplayName("left alone in an empty world, an agent covers all of it")
+        @DisplayName("left alone in a walled world, an agent covers all of it")
         void exploringCoversTheMap() {
             World world = new World(CONFIG.bounds());
             Agent agent = agentAt(HERE, Needs.healthy());
@@ -296,7 +305,7 @@ class DiscoveryTest {
             simulate(world, agent, new Journal()).run(120);
 
             assertEquals(
-                    agent.exploration().regionCount(),
+                    agent.exploration().regionsInView(agent.location()),
                     agent.exploration().regionsVisited(),
                     agent.exploration().toString());
         }
@@ -304,7 +313,7 @@ class DiscoveryTest {
         @Test
         @DisplayName("every discovery is something that is actually in the world")
         void discoveriesComeFromTheWorldNotAScript() {
-            World world = WorldGenerator.generate(CONFIG);
+            World world = WorldGenerator.forConfig(CONFIG);
             Agent agent = agentAt(HERE, Needs.healthy());
             Journal journal = new Journal();
 
@@ -334,7 +343,7 @@ class DiscoveryTest {
         }
 
         private List<String> discoveriesIn(SimulationConfig config) {
-            World world = WorldGenerator.generate(config);
+            World world = WorldGenerator.forConfig(config);
             Agent agent = agentAt(HERE, Needs.healthy());
             world.addAgent(agent);
             Simulation simulation =

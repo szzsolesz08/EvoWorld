@@ -4,15 +4,16 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.evoworld.core.world.Location;
-import dev.evoworld.core.world.WorldBounds;
+import dev.evoworld.core.world.ViewWindow;
 import java.util.Optional;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 
-/** The world on screen: square tiles, row 0 at the top, and room for the panel and feed. */
+/** The window on screen: square tiles, its first row at the top, and room for the panel and feed. */
 class MapLayoutTest {
 
-    private static final WorldBounds WORLD = WorldBounds.of(16, 16);
+    /** A window of sixteen tiles, the size the old whole world used to be. */
+    private static final ViewWindow WORLD = new ViewWindow(new Location(0, 0), 16, 16);
 
     @Test
     @DisplayName("the map is the largest square that fits beside the panel and above the feed")
@@ -37,7 +38,7 @@ class MapLayoutTest {
     }
 
     @Test
-    @DisplayName("row 0 is drawn at the top and column 0 at the left, as in the console map")
+    @DisplayName("the window's first row is drawn at the top and its first column at the left")
     void orientation() {
         MapLayout layout = MapLayout.fit(WORLD, 1120, 780);
         Location topLeft = new Location(0, 0);

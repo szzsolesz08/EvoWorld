@@ -294,7 +294,7 @@ class SimulationTest {
     }
 
     private WorldState runGeneratedWorld(SimulationConfig config) {
-        World world = WorldGenerator.generate(config);
+        World world = WorldGenerator.forConfig(config);
         world.addAgent(Agent.spawn("agent-1", "Atlas", config.bounds().center()));
         Simulation simulation = new Simulation(world, DeliberativeDecisionMaker.from(config), config);
         simulation.run(30);
@@ -362,7 +362,7 @@ class SimulationTest {
     @Test
     @DisplayName("start() readies a run for stepping by hand: once, and to the same effect as run()")
     void startingByHand() {
-        World world = WorldGenerator.generate(CONFIG);
+        World world = WorldGenerator.forConfig(CONFIG);
         world.addAgent(Agent.spawn("agent-1", "Atlas", CONFIG.bounds().center()));
         Simulation stepped = new Simulation(world, DeliberativeDecisionMaker.from(CONFIG), CONFIG);
         List<String> heard = new ArrayList<>();
@@ -386,7 +386,7 @@ class SimulationTest {
 
         assertEquals(List.of("started", "Born"), heard.subList(0, 2));
         assertEquals(1L, heard.stream().filter("started"::equals).count(), "only the first start counts");
-        World same = WorldGenerator.generate(CONFIG);
+        World same = WorldGenerator.forConfig(CONFIG);
         same.addAgent(Agent.spawn("agent-1", "Atlas", CONFIG.bounds().center()));
         Simulation ran = new Simulation(same, DeliberativeDecisionMaker.from(CONFIG), CONFIG);
         ran.run(50);

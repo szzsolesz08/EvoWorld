@@ -9,6 +9,7 @@ import dev.evoworld.core.intent.Intent;
 import dev.evoworld.core.knowledge.Belief;
 import dev.evoworld.core.memory.Memory;
 import dev.evoworld.core.memory.Recollection;
+import dev.evoworld.core.perception.KnownPlenty;
 import dev.evoworld.core.observer.SimulationObserver;
 import dev.evoworld.core.skill.Skills;
 import dev.evoworld.core.status.AgentStatus;
@@ -45,7 +46,8 @@ import org.slf4j.LoggerFactory;
  *    remembers  water at (2,8); found stone at (13,1); close call with thirst at (7,3)
  *    knows      berries: food, 8.0 a unit (98%); stone: not food, not a drink
  *    skills     move skilled (49% less effort), gather competent (35% less effort)
- *    explored   16 of 16 regions
+ *    plenty     berries x9 at region -3,0, 12 steps; water x4 at region 1,2, 9 steps
+ *    explored   17 of 81 regions nearby
  * </pre>
  *
  * <p>It asks the simulation for {@link AgentStatus} values rather than looking
@@ -56,6 +58,9 @@ public final class StatusReport implements SimulationObserver {
 
     private static final Logger log = LoggerFactory.getLogger("evoworld.status");
     private static final int WIDTH = 72;
+
+    /** How many remembered rich places are worth listing. */
+    private static final int PLENTY_SHOWN = 3;
 
     private final Simulation simulation;
     private final long every;
@@ -133,8 +138,28 @@ public final class StatusReport implements SimulationObserver {
                         .collect(Collectors.joining("; ")));
         row(lines, "knows", status.knowledge().isEmpty() ? "nothing yet" : describe(status.knowledge()));
         row(lines, "skills", describe(status.skills()));
-        row(lines, "explored", status.regionsVisited() + " of " + status.regionCount() + " regions");
+        if (!status.plenty().isEmpty()) {
+            row(lines, "plenty", status.plenty().stream()
+                    .limit(PLENTY_SHOWN)
+                    .map(StatusReport::describe)
+                    .collect(Collectors.joining("; ")));
+        }
+        // "nearby", because the world has no edges: 81 is the window the agent
+        // measures itself against, not a count of the world.
+        row(lines, "explored",
+                status.regionsVisited() + " of " + status.regionCount() + " regions nearby");
         return lines;
+    }
+
+    /** "berries x9 at region -3,0, 12 steps away". */
+    private static String describe(KnownPlenty known) {
+        return String.format(
+                Locale.ROOT,
+                "%s x%d at %s, %d steps",
+                known.type().label(),
+                known.seen(),
+                known.region(),
+                known.stepsAway());
     }
 
     private static String describe(Intent intent, Location from, long now) {

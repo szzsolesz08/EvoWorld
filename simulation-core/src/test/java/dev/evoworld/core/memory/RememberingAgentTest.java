@@ -32,7 +32,9 @@ class RememberingAgentTest {
 
     private static final SimulationConfig CONFIG = SimulationConfig.defaults(1L);
     private static final Location SPRING = new Location(2, 8);
-    private static final Location FAR_FROM_SPRING = new Location(12, 8);
+    /** Well beyond sight of the spring, however far the agent can see. */
+    private static final Location FAR_FROM_SPRING =
+            new Location(SPRING.x() + CONFIG.perceptionRadius() + 4, 8);
 
     private final PerceptionSystem senses = new PerceptionSystem(CONFIG.perceptionRadius());
     private final MotivationSystem motivations = MotivationSystem.standard();

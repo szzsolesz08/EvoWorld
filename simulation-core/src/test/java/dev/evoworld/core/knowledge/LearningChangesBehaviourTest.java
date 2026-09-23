@@ -24,6 +24,7 @@ import dev.evoworld.core.random.SimulationRandom;
 import dev.evoworld.core.resource.ResourceNode;
 import dev.evoworld.core.resource.ResourceType;
 import dev.evoworld.core.world.Location;
+import dev.evoworld.core.world.ChunkMix;
 import dev.evoworld.core.world.World;
 import dev.evoworld.core.world.WorldBounds;
 import java.time.Duration;
@@ -41,7 +42,13 @@ import org.junit.jupiter.api.Test;
 class LearningChangesBehaviourTest {
 
     private static final double EPSILON = 1e-9;
-    private static final SimulationConfig CONFIG = SimulationConfig.defaults(1L);
+    /**
+     * A world with edges, built by hand: these tests put one bush and one
+     * spring somewhere and watch what the agent makes of them, which only says
+     * anything if the agent cannot simply walk away into open country.
+     */
+    private static final SimulationConfig CONFIG =
+            SimulationConfig.defaults(1L).withWorld(WorldBounds.of(16, 16), ChunkMix.standard());
     private static final Location HERE = new Location(8, 8);
     private static final SimulationTime NOW = new SimulationTime(1L, Duration.ofMinutes(10));
 

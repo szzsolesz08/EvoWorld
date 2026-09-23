@@ -2,11 +2,16 @@ package dev.evoworld.viewer;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.evoworld.core.Simulation;
 import dev.evoworld.core.SimulationConfig;
 import dev.evoworld.core.agent.Needs;
+import dev.evoworld.core.agent.Agent;
+import dev.evoworld.core.world.Chunk;
+import dev.evoworld.core.world.Location;
+import dev.evoworld.core.world.ViewWindow;
 import dev.evoworld.core.event.SimulationEvent;
 import dev.evoworld.runner.EvoWorldRunner;
 import dev.evoworld.runner.survey.Scenario;
@@ -153,5 +158,28 @@ class ViewerModelTest {
         assertEquals(0, model.advance(1.0));
         model.stepOnce();
         assertEquals(diedAt, tick(model));
+    }
+
+    @Test
+    @DisplayName("the map shows the chunk the agent is in, and changes when it crosses into the next")
+    void theViewIsAChunkAtATime() {
+        Simulation simulation = fresh();
+        ViewerModel model = new ViewerModel(simulation, FOUR_A_SECOND);
+        Agent atlas = simulation.world().agents().get(0);
+
+        ViewWindow home = model.windowInView();
+        assertEquals(Chunk.SIZE, home.across());
+        assertEquals(Chunk.SIZE, home.down());
+        assertTrue(home.contains(atlas.location()), "the agent is on the map it is drawn on");
+
+        // Over the border, and the view is the next chunk along. It does not
+        // follow the agent: it is the ground, and the ground changed.
+        atlas.moveTo(new Location(Chunk.SIZE + 20, 20));
+        model.stepOnce();
+        ViewWindow next = model.windowInView();
+
+        assertEquals(ViewWindow.of(new Chunk(1, 0)), next);
+        assertNotEquals(home, next);
+        assertTrue(next.contains(atlas.location()));
     }
 }

@@ -17,16 +17,24 @@ public record ExplorationView(
         List<UnexploredArea> frontier,
         double worldFamiliarity,
         int regionsVisited,
-        int regionCount) {
+        int regionCount,
+        List<KnownPlenty> plenty) {
 
     public static final ExplorationView NOTHING_SEEN =
-            new ExplorationView(List.of(), 0.0, 0, 0);
+            new ExplorationView(List.of(), 0.0, 0, 0, List.of());
 
     public ExplorationView {
         frontier = List.copyOf(frontier);
+        plenty = List.copyOf(plenty);
     }
 
-    /** How much of the world the agent has lost track of, or never had. */
+    /** Without any memory of plenty; for tests and for a mind that has seen nothing yet. */
+    public ExplorationView(
+            List<UnexploredArea> frontier, double worldFamiliarity, int regionsVisited, int regionCount) {
+        this(frontier, worldFamiliarity, regionsVisited, regionCount, List.of());
+    }
+
+    /** How much of the country around it the agent has lost track of, or never had. */
     public double unexploredFraction() {
         return 1.0 - worldFamiliarity;
     }

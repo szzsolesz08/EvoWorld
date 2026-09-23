@@ -53,8 +53,15 @@ public final class EventLog implements SimulationObserver {
 
     @Override
     public void onSimulationStarted(WorldState state) {
-        log.info("[{}] the world begins: {} with {} resource node(s)",
-                when(state.time()), state.bounds(), state.resources().size());
+        // An endless world has nothing in it yet: it is built as it is walked
+        // into, so counting its nodes before anyone has looked says nothing.
+        if (state.bounds().isEndless()) {
+            log.info("[{}] the world begins: endless, and unmade until someone walks into it",
+                    when(state.time()));
+        } else {
+            log.info("[{}] the world begins: {} with {} resource node(s)",
+                    when(state.time()), state.bounds(), state.resources().size());
+        }
     }
 
     @Override

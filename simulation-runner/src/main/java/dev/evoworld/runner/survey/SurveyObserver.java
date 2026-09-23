@@ -15,10 +15,13 @@ import dev.evoworld.core.goal.SatisfyHungerGoal;
 import dev.evoworld.core.goal.SatisfyThirstGoal;
 import dev.evoworld.core.observer.SimulationObserver;
 import dev.evoworld.core.world.AgentSnapshot;
+import dev.evoworld.core.world.Chunk;
 import dev.evoworld.core.world.Location;
 import dev.evoworld.core.world.WorldState;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.Optional;
 import java.util.TreeMap;
 
@@ -72,8 +75,15 @@ public final class SurveyObserver implements SimulationObserver {
     private int sleeps;
     private int meals;
     private int drinks;
+    // Sittings, not mouthfuls: four bites in a row is one meal, which is what
+    // "meals a day" means to a reader - and what makes the number comparable
+    // between runs cut into ten-minute and hour-long ticks.
+    private long lastMealTick = Long.MIN_VALUE;
+    private long lastDrinkTick = Long.MIN_VALUE;
     private int upkeepTicks;
 
+    /** Which country it has been in: how much of an endless world one life covers. */
+    private final Set<Chunk> chunksEntered = new LinkedHashSet<>();
     private Location twoStepsAgo;
     private Location lastPlace;
     private long lastStepTick = -1;
@@ -92,6 +102,7 @@ public final class SurveyObserver implements SimulationObserver {
             startedHurt = !agent.needs().isFullyHealthy();
             lowestHealth = agent.needs().health();
             lastPlace = agent.location();
+            chunksEntered.add(Chunk.containing(agent.location()));
         });
     }
 
@@ -126,10 +137,16 @@ public final class SurveyObserver implements SimulationObserver {
             rests++;
         }
         if (outcome.succeeded() && outcome.actionName().equals(EatAction.NAME)) {
-            meals++;
+            if (tick != lastMealTick + 1) {
+                meals++;
+            }
+            lastMealTick = tick;
         }
         if (outcome.succeeded() && outcome.actionName().equals(DrinkAction.NAME)) {
-            drinks++;
+            if (tick != lastDrinkTick + 1) {
+                drinks++;
+            }
+            lastDrinkTick = tick;
         }
         if (outcome.wasBlocked() || outcome.wasImpossible()) {
             refusals.merge(outcome.actionName(), 1, Integer::sum);
@@ -177,6 +194,7 @@ public final class SurveyObserver implements SimulationObserver {
 
     private void follow(AgentSnapshot agent, long tick) {
         Location here = agent.location();
+        chunksEntered.add(Chunk.containing(here));
         if (here.equals(lastPlace)) {
             return;
         }
@@ -274,6 +292,7 @@ public final class SurveyObserver implements SimulationObserver {
                 sleeps,
                 meals,
                 drinks,
-                upkeepTicks * tickHours);
+                upkeepTicks * tickHours,
+                chunksEntered.size());
     }
 }

@@ -45,9 +45,13 @@ class WorldMapRendererTest {
                         node(ResourceType.STONE, 3, 0, 30.0)));
 
         List<String> lines = WorldMapRenderer.render(state);
-        String firstRow = lines.stream().filter(line -> line.startsWith("  0 ")).findFirst().orElseThrow();
+        // Rows are labelled with their world coordinate, which is now wide
+        // enough for a place a long walk from the origin.
+        String label = String.format(java.util.Locale.ROOT, "%6d ", 0);
+        String firstRow =
+                lines.stream().filter(line -> line.startsWith(label)).findFirst().orElseThrow();
 
-        assertEquals("  0 ~ b T o ", firstRow);
+        assertEquals(label + "~ b T o ", firstRow);
     }
 
     @Test

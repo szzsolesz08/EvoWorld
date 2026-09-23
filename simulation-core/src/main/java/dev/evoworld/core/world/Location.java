@@ -9,8 +9,19 @@ public record Location(int x, int y) {
         return new Location(x, y);
     }
 
+    /**
+     * One location this far away, never past the edge of the world.
+     *
+     * <p>Clamped rather than wrapped or overflowing: the world runs to
+     * {@link WorldBounds#LIMIT} in each direction, and a step at the edge stays
+     * where it is.
+     */
     public Location translated(int dx, int dy) {
-        return new Location(x + dx, y + dy);
+        return new Location(clamp((long) x + dx), clamp((long) y + dy));
+    }
+
+    private static int clamp(long coordinate) {
+        return (int) Math.min(WorldBounds.LIMIT, Math.max(-WorldBounds.LIMIT, coordinate));
     }
 
     /** Grid distance where diagonal movement is not allowed. */

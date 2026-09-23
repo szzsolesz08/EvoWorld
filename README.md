@@ -12,20 +12,21 @@ does, and carries on for weeks of simulated time without anyone touching anythin
 [day 2 04:20] Atlas learned wood nourishment: 0.0 hunger per unit (0.25 sure after 1)
 [day 2 05:30] Atlas learned berries nourishment: 8.0 hunger per unit (0.25 sure after 1)
 
--- day 6 00:00 -- Atlas ------------------------------------------------
-   status     alive, age 5d 0h, health 100.0
-   location   (7,8)
-   needs      hunger 7.0, thirst 7.3, energy 53.2
-   carrying   berries 13.5
-   wants      recover energy (0.56)
-   doing      sleeping, 4h 40m left
-   intent     heading for (10,10) to explore, 5 steps to go, set out 20 ticks ago
-   remembers  berries at (8,8); found berries at (8,8); water at (3,8); berries at (10,5);
-              found water at (3,8)
-   knows      berries: not a drink, food, 8.0 a unit (79%);
-              water: drink, 12.0 a unit (86%), not food; wood: not a drink, not food
-   skills     move skilled (49% less effort), gather apprentice (21% less effort)
-   explored   16 of 16 regions
+-- day 7 00:00 -- Atlas ------------------------------------------------
+   status     alive, age 6d 0h, health 100.0
+   location   (-264,-30)
+   needs      hunger 28.8, thirst 55.7, energy 90.8
+   carrying   berries 1.0, wood 5.0
+   wants      recover energy (0.58)
+   doing      sleeping, 50m left
+   intent     heading for (-266,-28) to satisfy thirst, 4 steps to go, set out 45 ticks ago
+   remembers  water at (-266,-28); found berries at (-259,-32); berries at (-259,-32);
+              found wood at (-257,-29); found stone at (-257,-31)
+   knows      berries: not a drink, food, 8.0 a unit (75%);
+              water: drink, 12.0 a unit (85%), not food; stone: not a drink;
+              wood: not a drink, not food
+   skills     move skilled (49% less effort), gather apprentice (14% less effort)
+   explored   22 of 81 regions nearby
 ```
 
 Nothing in that output was scripted. Atlas is born knowing nothing about berries. The
@@ -57,11 +58,11 @@ and the full pipeline from perception to learning, running unattended and reprod
 
 | Area | What exists |
 | --- | --- |
-| World | a seeded 16×16 world; berries, water, wood and stone; resources that regrow at their own rates (stone never does) |
+| World | an endless seeded world in 64×64 chunks, built as it is walked into and stable ever after; country that varies from berry field to bare slope; berries, water, wood and stone that regrow at their own rates (stone never does). A walled world of any size is still available |
 | Time | discrete ticks of configurable simulated length (default 10 minutes); days and hours in all output |
 | Body | hunger, thirst, energy and health at realistic hourly rates; energy spent awake and restored asleep; unmet needs that do damage; healing when looked after, fastest asleep |
 | Actions | move, gather, eat, drink, rest, sleep, discard; explicit preconditions, structured outcomes, multi-tick work |
-| Perception | a six-step field of view; nothing beyond it is known except by memory |
+| Perception | a twelve-step field of view, about two hours' walk; nothing beyond it is known except by memory |
 | Goals | four wants (thirst, hunger, energy, curiosity) scored from the body, never from a rule |
 | Decisions | propose, evaluate, select: six-factor utility, no if/else behaviour anywhere |
 | Memory | six kinds of memory with decaying confidence, bounded, recalled by relevance |
@@ -153,10 +154,11 @@ The only route from world to mind. A `Perception` holds three distinct kinds of
 knowledge:
 
 - **self:** the agent's own body and inventory, always known in full.
-- **sensed:** resources and agents within six **steps** (walking distance, so "four steps
-  north" is directly comparable to what walking there will cost).
-- **known:** remembered places the agent can no longer see, with faded confidence;
-  everything it has worked out; how much of the world it has covered.
+- **sensed:** resources and agents within twelve **steps** (walking distance, so "four
+  steps north" is directly comparable to what walking there will cost).
+- **known:** remembered places the agent can no longer see, with faded confidence; where
+  there was a *lot* of something, faded the same way; everything it has worked out; how
+  familiar the country around it is.
 
 ### Goals
 
@@ -307,16 +309,30 @@ true values, at 98% confidence.
 ### Exploration and experiment
 
 A coverage map records how recently the agent stood in each 4×4 region, with familiarity
-halving every 500 ticks. The frontier is simply the least familiar regions. A swept map
-makes curiosity fall; familiarity fades; curiosity returns and the agent goes round
-again. Nothing schedules it.
+halving every 500 ticks. The frontier is simply the least familiar regions - least
+familiar first and, among places equally unknown, the nearest. A swept map makes
+curiosity fall; familiarity fades; curiosity returns and the agent goes round again.
+Nothing schedules it.
 
-A **discovery** is the first sighting of something, or of something somewhere new. No
-list of discoveries exists anywhere; they come from comparing what is in view with what
-the agent has seen before.
+Because the world has no end, all of this is measured over a **window** around the agent
+rather than over the whole map: an agent that measured itself against an endless world
+would be forever at nought, restless wherever it stood.
 
-When comfortable, an agent **experiments**: it tastes things it has never tried, for
-curiosity's sake rather than hunger's. The reward is what is left to learn. The risk is
+The map also keeps **what the country was like**: per region, the most of each kind it saw
+there at once, faded by how long ago. That is the difference between "there was a bush
+over there" and "that whole slope was berries" - one is a meal, the other is worth the
+walk again tomorrow. Wood and stone are recorded too, ready for crafting to want them.
+Somewhere he has never been offers nothing, however rich it is: this is memory, not second
+sight.
+
+A **discovery** is the first sighting of something, or of something in a chunk of the world
+where he had not seen it before. No list of discoveries exists anywhere; they come from
+comparing what is in view with what the agent has seen before.
+
+When comfortable, an agent **experiments**: it tastes things it has never tried, and walks
+to an untried kind of thing in sight to try it, for curiosity's sake rather than hunger's.
+Curiosity that only worked underfoot let a newborn walk past springs for a day and a half
+and then meet its first real thirst knowing nothing. The reward is what is left to learn. The risk is
 a tick, a mouthful, and what its needs do meanwhile. Samples it has found useless are put
 down when they are taking up room it needs.
 
@@ -463,7 +479,8 @@ measuring cannot change a run, and the report is the same however many threads t
 | `hourly` | 60-minute ticks, 2,000 of them (83 days) |
 | `wounded` | starts at health 30 |
 | `hungry-world` | hunger and thirst rise 1.5 times as fast |
-| `sparse` | half the resource nodes |
+| `sparse` | hard country: chunks half as rich, and more variable |
+| `walled` | a finite 16×16 world, generated whole |
 
 Most columns are what they say. A few need a definition:
 
@@ -546,8 +563,9 @@ Honest ones, most important first.
 - **Greedy, one step at a time.** The agent scores the next action, never a sequence.
   Standing in a spring while mildly thirsty, it walks away rather than topping up, because
   nothing models "this saves a walk later".
-- **A small, simple world.** 16×16 tiles, four resource types, no terrain, weather,
-  day and night, or line of sight. The field of view is a diamond measured in steps.
+- **A simple world.** Endless, but flat: four resource types, no terrain, weather, day and
+  night, or line of sight. The field of view is a diamond measured in steps. Chunks vary
+  only in how much they hold, not in what kind of place they are.
 - **Wood and stone have no use.** They are only ever gathered as experiments, and put
   down once the agent learns they are not food.
 - **One agent.** Perception of other agents exists and is tested, but nothing reacts to

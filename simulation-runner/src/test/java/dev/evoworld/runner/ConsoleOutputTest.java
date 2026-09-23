@@ -15,6 +15,7 @@ import dev.evoworld.core.exploration.Region;
 import dev.evoworld.core.resource.ResourceType;
 import dev.evoworld.core.skill.SkillLevel;
 import dev.evoworld.core.status.AgentStatus;
+import dev.evoworld.core.world.Chunk;
 import dev.evoworld.core.world.Location;
 import dev.evoworld.persistence.SaveFile;
 import java.nio.file.Files;
@@ -81,7 +82,9 @@ class ConsoleOutputTest {
                 List<String> lines = StatusReport.lines(status, simulation.config().tickDuration());
                 if (status.busyFor() > 0) {
                     sawBusy = true;
-                    assertTrue(row(lines, "doing").contains("to go"), row(lines, "doing"));
+                    String doing = row(lines, "doing");
+                    // A job says how much is left, in ticks or - for a sleep - in hours.
+                    assertTrue(doing.contains("to go") || doing.contains("left"), doing);
                 } else if (status.doing().isPresent()) {
                     sawDone = true;
                     row(lines, "last act");
@@ -133,10 +136,10 @@ class ConsoleOutputTest {
 
         private final SimulationEvent firstFind = new SimulationEvent.Discovered(
                 NOON, AgentId.of("a"), "Atlas",
-                new Discovery(ResourceType.WATER, new Location(1, 1), new Region(0, 0), NOON, true));
+                new Discovery(ResourceType.WATER, new Location(1, 1), new Chunk(0, 0), NOON, true));
         private final SimulationEvent anotherFind = new SimulationEvent.Discovered(
                 NOON, AgentId.of("a"), "Atlas",
-                new Discovery(ResourceType.WATER, new Location(9, 9), new Region(2, 2), NOON, false));
+                new Discovery(ResourceType.WATER, new Location(9, 9), new Chunk(2, 2), NOON, false));
         private final SimulationEvent skill = new SimulationEvent.SkillImproved(
                 NOON, AgentId.of("a"), "Atlas", "MOVE", SkillLevel.APPRENTICE);
         private final SimulationEvent death = new SimulationEvent.Died(

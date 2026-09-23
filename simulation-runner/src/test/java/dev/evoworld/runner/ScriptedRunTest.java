@@ -16,7 +16,9 @@ import dev.evoworld.core.action.RestAction;
 import dev.evoworld.core.agent.AgentId;
 import dev.evoworld.core.observer.SimulationObserver;
 import dev.evoworld.core.resource.ResourceType;
+import dev.evoworld.core.world.ChunkMix;
 import dev.evoworld.core.world.World;
+import dev.evoworld.core.world.WorldBounds;
 import dev.evoworld.core.world.WorldGenerator;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,7 +28,13 @@ import org.junit.jupiter.api.Test;
 /** Driving hand-picked actions through the real simulation. */
 class ScriptedRunTest {
 
-    private static final SimulationConfig CONFIG = SimulationConfig.defaults(42L);
+    /**
+     * A world with edges. The script is written up front from what is on the
+     * map, and an endless world has nothing on it until someone walks there -
+     * so a scripted demonstration needs a world that already exists.
+     */
+    private static final SimulationConfig CONFIG = SimulationConfig.defaults(42L)
+            .withWorld(WorldBounds.of(16, 16), ChunkMix.standard());
 
     private static final class OutcomeRecorder implements SimulationObserver {
         final List<ActionOutcome> outcomes = new ArrayList<>();
@@ -46,7 +54,7 @@ class ScriptedRunTest {
     }
 
     private List<Action> forageScript() {
-        World world = WorldGenerator.generate(CONFIG);
+        World world = WorldGenerator.forConfig(CONFIG);
         return ActionScripts.forage(world, CONFIG.bounds().center(), CONFIG);
     }
 
@@ -120,7 +128,7 @@ class ScriptedRunTest {
     void scriptOutlivesItself() {
         ScriptedDecisionMaker scripted =
                 new ScriptedDecisionMaker(List.of(new RestAction()));
-        World world = WorldGenerator.generate(CONFIG);
+        World world = WorldGenerator.forConfig(CONFIG);
         world.addAgent(
                 dev.evoworld.core.agent.Agent.spawn("agent-1", "Atlas", CONFIG.bounds().center()));
         Simulation simulation = new Simulation(world, scripted, CONFIG);

@@ -2,6 +2,7 @@ package dev.evoworld.core;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.evoworld.core.action.Action;
@@ -24,6 +25,7 @@ import dev.evoworld.core.observer.SimulationObserver;
 import dev.evoworld.core.resource.ResourceSnapshot;
 import dev.evoworld.core.resource.ResourceType;
 import dev.evoworld.core.world.AgentSnapshot;
+import dev.evoworld.core.world.Chunk;
 import dev.evoworld.core.world.Location;
 import dev.evoworld.core.world.World;
 import dev.evoworld.core.world.WorldGenerator;
@@ -84,6 +86,11 @@ class AutonomousSimulationTest {
         double lowestHealth = Needs.MAX;
         int longestDithering;
         long sleepTicks;
+        // A meal is a sitting, not a mouthful: four bites in a row is one meal
+        // however long a tick is, and counting mouthfuls made the same day look
+        // different at ten minutes a tick and at thirty.
+        private long lastMealTick = Long.MIN_VALUE;
+        private long lastDrinkTick = Long.MIN_VALUE;
         int sleeps;
         int meals;
         int drinks;
@@ -112,10 +119,16 @@ class AutonomousSimulationTest {
             if (outcome.succeeded()) {
                 succeeded.add(outcome.actionName());
                 if (outcome.actionName().equals(EatAction.NAME)) {
-                    meals++;
+                    if (tick != lastMealTick + 1) {
+                        meals++;
+                    }
+                    lastMealTick = tick;
                 }
                 if (outcome.actionName().equals(DrinkAction.NAME)) {
-                    drinks++;
+                    if (tick != lastDrinkTick + 1) {
+                        drinks++;
+                    }
+                    lastDrinkTick = tick;
                 }
             }
             if (outcome.wasImpossible() && lastChosen != null) {
@@ -142,10 +155,11 @@ class AutonomousSimulationTest {
         }
 
         private void checkResources(WorldState state, long tick) {
-            if (resourceCount < 0) {
-                resourceCount = state.resources().size();
-            }
-            check(state.resources().size() == resourceCount, tick, "resources appeared or vanished");
+            // No fixed tally: a snapshot of an endless world carries the ground
+            // around the agent, and there is more of it as the agent walks into
+            // country that did not exist before. What must hold is that every
+            // node in view is a sane node in a real place.
+            resourceCount = Math.max(resourceCount, state.resources().size());
             for (ResourceSnapshot node : state.resources()) {
                 check(node.quantity() >= 0.0, tick, "negative resource " + node);
                 check(node.quantity() <= node.capacity() + 1e-9, tick, "overfull resource " + node);
@@ -269,7 +283,7 @@ class AutonomousSimulationTest {
     }
 
     private Run runAutonomously(SimulationConfig config, Needs startingAs, long ticks) {
-        World world = WorldGenerator.generate(config);
+        World world = WorldGenerator.forConfig(config);
         Agent agent = new Agent(
                 AgentId.of("agent-1"), "Atlas", config.bounds().center(), startingAs);
         world.addAgent(agent);
@@ -387,8 +401,10 @@ class AutonomousSimulationTest {
         assertEquals(0L, run.auditor().count(SimulationEvent.DangerBegan.class), "never in danger");
         assertTrue(day.sleepHours() >= 7.0 && day.sleepHours() <= 10.0, "sleep " + day);
         assertTrue(day.sleeps() >= 0.9 && day.sleeps() <= 1.5, "about one night a day " + day);
-        assertTrue(day.meals() >= 1.5 && day.meals() <= 4.5, "meals " + day);
-        assertTrue(day.drinks() >= 2.0 && day.drinks() <= 9.0, "drinks " + day);
+        // Sittings a day, not mouthfuls: a big meal and sometimes a second,
+        // and a couple of stops at water.
+        assertTrue(day.meals() >= 1.0 && day.meals() <= 4.0, "meals " + day);
+        assertTrue(day.drinks() >= 1.5 && day.drinks() <= 6.0, "drinks " + day);
     }
 
     @Test
@@ -438,8 +454,8 @@ class AutonomousSimulationTest {
         }
 
         // exploring
-        assertEquals(atlas.exploration().regionCount(), atlas.exploration().regionsVisited(),
-                "should have been everywhere: " + atlas.exploration());
+        assertTrue(atlas.exploration().regionsVisited() >= 9,
+                "should have covered ground: " + atlas.exploration());
 
         // remembering discoveries
         assertTrue(seen.count(SimulationEvent.Discovered.class) > 0);
@@ -461,6 +477,21 @@ class AutonomousSimulationTest {
 
         // a report every simulated day
         assertEquals(LONG_RUN / run.simulation().ticksPerDay(), seen.count(SimulationEvent.DayPassed.class));
+    }
+
+    @Test
+    @DisplayName("twenty days take it well beyond the chunk it was born in, and the world keeps up")
+    void aLifeCoversRealGround() {
+        Run run = runAutonomously(7L, LONG_RUN);
+        World world = run.simulation().world();
+        Chunk born = Chunk.containing(world.bounds().center());
+        Chunk ended = Chunk.containing(run.agent().location());
+
+        assertTrue(world.chunkCount() > 1, "the world should have grown as it walked");
+        assertNotEquals(born, ended, "a life should not fit in one chunk any more: " + ended);
+        assertTrue(
+                run.agent().exploration().regionsVisited() > 0,
+                "and it should remember the country it crossed");
     }
 
     @Test
@@ -495,7 +526,7 @@ class AutonomousSimulationTest {
     @DisplayName("a death, when it comes, is reported once and stops the run")
     void deathIsReportedAndEndsTheRun() {
         SimulationConfig config = SimulationConfig.defaults(3L);
-        World world = WorldGenerator.generate(config);
+        World world = WorldGenerator.forConfig(config);
         Agent doomed = new Agent(
                 AgentId.of("agent-1"), "Atlas", config.bounds().center(),
                 new Needs(Needs.MAX, Needs.MAX, 50.0, 10.0));

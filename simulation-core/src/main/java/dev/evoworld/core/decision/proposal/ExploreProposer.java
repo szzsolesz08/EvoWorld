@@ -31,6 +31,9 @@ import java.util.List;
  */
 public final class ExploreProposer implements ActionProposer {
 
+    /** How far a wander goes when there is nothing better: about a day's walk. */
+    private static final int WANDER_REACH = 24;
+
     /** How sure an agent is that unseen ground is worth the walk. */
     public static final double SPECULATIVE = 0.5;
 
@@ -66,12 +69,18 @@ public final class ExploreProposer implements ActionProposer {
         return List.copyOf(candidates);
     }
 
-    /** Somewhere, anywhere - for when the frontier has nothing left to offer. */
+    /**
+     * Somewhere, anywhere nearby - for when the frontier has nothing left to
+     * offer. Nearby rather than anywhere at all: in an endless world "a random
+     * tile" would be a lifetime's walk away.
+     */
     private java.util.Optional<ActionCandidate> wander(
             Perception perception, SimulationRandom random) {
-        WorldBounds bounds = perception.bounds();
-        Location target =
-                new Location(random.nextInt(bounds.width()), random.nextInt(bounds.height()));
+        Location here = perception.location();
+        int reach = WANDER_REACH;
+        Location target = perception.bounds().clamp(new Location(
+                here.x() - reach + random.nextInt(2 * reach + 1),
+                here.y() - reach + random.nextInt(2 * reach + 1)));
         if (target.equals(perception.location())) {
             return java.util.Optional.empty();
         }

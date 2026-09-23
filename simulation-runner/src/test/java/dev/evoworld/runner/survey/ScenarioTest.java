@@ -7,6 +7,8 @@ import dev.evoworld.core.Simulation;
 import dev.evoworld.core.SimulationConfig;
 import dev.evoworld.core.agent.MetabolismRates;
 import dev.evoworld.core.agent.Needs;
+import dev.evoworld.core.resource.ResourceType;
+import dev.evoworld.core.world.ChunkMix;
 import dev.evoworld.core.world.WorldGenerator;
 import dev.evoworld.runner.EvoWorldRunner;
 import java.time.Duration;
@@ -62,14 +64,20 @@ class ScenarioTest {
     }
 
     @Test
-    @DisplayName("sparse has half of every kind of resource, and at least one of each")
+    @DisplayName("sparse is hard country: half the food and materials, but never dry")
     void sparseWorld() {
-        int full = WorldGenerator.DEFAULT_PLAN.stream().mapToInt(WorldGenerator.ResourcePlan::nodeCount).sum();
-        int sparse = built(Scenario.SPARSE).world().resources().size();
+        ChunkMix standard = ChunkMix.standard();
+        ChunkMix lean = built(Scenario.SPARSE).config().chunks();
 
-        assertEquals(16, full);
-        assertEquals(7, sparse, "1 water, 3 berries, 2 wood, 1 stone");
-        assertTrue(Scenario.SPARSE.resources().stream().allMatch(plan -> plan.nodeCount() >= 1));
+        for (ResourceType type : List.of(ResourceType.BERRIES, ResourceType.WOOD, ResourceType.STONE)) {
+            assertEquals(
+                    standard.average().get(type) / 2,
+                    lean.average().get(type),
+                    type + " should be half as common");
+        }
+        // Water is the exception: thirst does not care how hard the country is.
+        assertTrue(lean.countOf(ResourceType.WATER, lean.leanest()) >= ChunkMix.SPRINGS_AT_LEAST,
+                "even the leanest chunk has springs");
     }
 
     @Test

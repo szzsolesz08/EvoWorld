@@ -5,6 +5,7 @@ import dev.evoworld.core.decision.Decision;
 import dev.evoworld.core.goal.GoalPriority;
 import dev.evoworld.core.knowledge.Belief;
 import dev.evoworld.core.memory.Recollection;
+import dev.evoworld.core.perception.KnownPlenty;
 import dev.evoworld.core.skill.Skills;
 import dev.evoworld.core.world.AgentSnapshot;
 import java.util.List;
@@ -26,6 +27,7 @@ import java.util.Optional;
  * @param memories the handful of things it remembers that matter most right
  *     now, most relevant first
  * @param knowledge what it has actually tested, in the order it learned it
+ * @param plenty where it remembers there being a lot of something, best first
  */
 public record AgentStatus(
         SimulationTime time,
@@ -37,7 +39,8 @@ public record AgentStatus(
         List<Belief> knowledge,
         Skills skills,
         int regionsVisited,
-        int regionCount) {
+        int regionCount,
+        List<KnownPlenty> plenty) {
 
     public AgentStatus {
         Objects.requireNonNull(time, "time");
@@ -47,5 +50,6 @@ public record AgentStatus(
         Objects.requireNonNull(skills, "skills");
         memories = List.copyOf(memories);
         knowledge = List.copyOf(knowledge);
+        plenty = List.copyOf(plenty);
     }
 }

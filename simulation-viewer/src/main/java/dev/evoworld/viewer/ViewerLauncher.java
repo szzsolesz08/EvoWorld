@@ -38,8 +38,9 @@ public final class ViewerLauncher {
         Lwjgl3ApplicationConfiguration window = new Lwjgl3ApplicationConfiguration();
         window.setTitle("EvoWorld - seed " + simulation.config().seed()
                 + (options.load().isPresent() ? " (loaded)" : ", " + options.scenario().name()));
-        window.setWindowedMode(1120, 780);
-        window.setWindowSizeLimits(900, 640, -1, -1);
+        // Room for a whole 64-tile chunk beside the panel.
+        window.setWindowedMode(1600, 1000);
+        window.setWindowSizeLimits(1100, 720, -1, -1);
         window.useVsync(true);
         window.setForegroundFPS(60);
         new Lwjgl3Application(new ViewerScreen(

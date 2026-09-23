@@ -53,4 +53,42 @@ class WorldBoundsTest {
         assertThrows(IllegalArgumentException.class, () -> WorldBounds.of(5, 0));
         assertThrows(IllegalArgumentException.class, () -> WorldBounds.of(-1, 5));
     }
+
+    @Test
+    @DisplayName("an endless world holds anything within the limit, and nothing beyond it")
+    void endlessWorldsAreAlmostInfinite() {
+        WorldBounds endless = WorldBounds.endless();
+
+        assertTrue(endless.isEndless());
+        assertFalse(WorldBounds.of(16, 16).isEndless());
+        assertTrue(endless.contains(new Location(0, 0)));
+        assertTrue(endless.contains(new Location(-WorldBounds.LIMIT, WorldBounds.LIMIT)));
+        assertEquals(new Location(0, 0), endless.center(), "the origin is the middle of nowhere");
+    }
+
+    @Test
+    @DisplayName("the limit is a wall at the end of the world, not an overflow")
+    void theLimitHolds() {
+        WorldBounds endless = WorldBounds.endless();
+        Location edge = new Location(WorldBounds.LIMIT, WorldBounds.LIMIT);
+
+        assertEquals(edge, endless.clamp(new Location(Integer.MAX_VALUE, Integer.MAX_VALUE)));
+        // Far enough inside Integer.MAX_VALUE that the distance between any two
+        // places in the world still fits in an int, which is what every
+        // distance in the simulation is measured in.
+        assertTrue(
+                (long) endless.width() * 2 < Integer.MAX_VALUE,
+                "a walk across the world must be countable");
+        long across = 2L * WorldBounds.LIMIT + 1;
+        assertEquals(across * across, endless.tileCount(),
+                "counted as a long, because an int would wrap");
+    }
+
+    @Test
+    @DisplayName("bounds beyond the limit are refused rather than quietly wrapped")
+    void rejectsWorldsBeyondTheLimit() {
+        assertThrows(
+                IllegalArgumentException.class,
+                () -> new WorldBounds(-WorldBounds.LIMIT - 1, 0, 0, 0));
+    }
 }

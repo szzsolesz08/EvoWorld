@@ -2,6 +2,7 @@ package dev.evoworld.core.decision.proposal;
 
 import dev.evoworld.core.action.DrinkAction;
 import dev.evoworld.core.action.EatAction;
+import dev.evoworld.core.action.MoveAction;
 import dev.evoworld.core.agent.Needs;
 import dev.evoworld.core.decision.ActionCandidate;
 import dev.evoworld.core.decision.ActionProposer;
@@ -13,7 +14,10 @@ import dev.evoworld.core.perception.Perception;
 import dev.evoworld.core.random.SimulationRandom;
 import dev.evoworld.core.resource.ResourceType;
 import java.util.ArrayList;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Locale;
+import java.util.Map;
 import java.util.Optional;
 
 /**
@@ -24,6 +28,13 @@ import java.util.Optional;
  * than a meal, serving {@link ExploreGoal} rather than a bodily need. That is
  * why a comfortable agent investigates and a desperate one does not: curiosity
  * only wins when nothing is pressing, which is exactly when it should.
+ *
+ * <p>Curiosity has legs, too: a kind of thing the agent has never tried and
+ * can see is worth walking to, for the same reason and at the same price. That
+ * matters in a world you can walk out of. An agent that only ever tries what it
+ * is already standing on can march past a spring a dozen times without learning
+ * that water is a drink, and then meet its first real thirst knowing nothing -
+ * which is how a newborn dies within sight of water.
  *
  * <p>The reward is what there is to find out, {@code 1 - confidence}, so a
  * complete unknown is worth the most and something already tested is worth
@@ -36,9 +47,17 @@ import java.util.Optional;
 public final class InvestigateProposer implements ActionProposer {
 
     private final double sample;
+    private final double moveEnergyCost;
+    private final int stepsPerTick;
 
     public InvestigateProposer(double sample) {
+        this(sample, 0.0, 1);
+    }
+
+    public InvestigateProposer(double sample, double moveEnergyCost, int stepsPerTick) {
         this.sample = sample;
+        this.moveEnergyCost = moveEnergyCost;
+        this.stepsPerTick = stepsPerTick;
     }
 
     @Override
@@ -75,7 +94,51 @@ public final class InvestigateProposer implements ActionProposer {
                     knowledge.confidence(BeliefKind.NOURISHMENT, type),
                     "never tried eating " + type.label()));
         }
+
+        if (canReadThirst && moveEnergyCost > 0.0) {
+            nearestOfEachUntriedKind(perception).forEach((type, seen) -> candidates.add(goAndSee(
+                    seen, knowledge.confidence(BeliefKind.HYDRATION, type))));
+        }
         return List.copyOf(candidates);
+    }
+
+    /**
+     * The nearest thing of each kind in view that has never been tried as a
+     * drink. One walk per kind, not per bush: the point is to find out what a
+     * kind of thing is, and any one of them answers that.
+     */
+    private Map<ResourceType, PerceivedResource> nearestOfEachUntriedKind(Perception perception) {
+        Map<ResourceType, PerceivedResource> nearest = new LinkedHashMap<>();
+        for (PerceivedResource seen : perception.resources()) {
+            if (!seen.isAvailable()
+                    || seen.isUnderfoot()
+                    || perception.knowledge().hasTested(BeliefKind.HYDRATION, seen.type())) {
+                continue;
+            }
+            nearest.merge(seen.type(), seen,
+                    (first, other) -> other.stepsAway() < first.stepsAway() ? other : first);
+        }
+        return nearest;
+    }
+
+    private ActionCandidate goAndSee(PerceivedResource target, double confidence) {
+        int steps = target.stepsAway();
+        return ActionCandidate.heading(
+                target.location(),
+                new MoveAction(target.location(), moveEnergyCost, stepsPerTick),
+                ExploreGoal.NAME,
+                1.0 - confidence,
+                // It can see the thing; what it does not know is what the thing
+                // is, and that is what the walk is for.
+                1.0,
+                steps,
+                steps * moveEnergyCost,
+                String.format(
+                        Locale.ROOT,
+                        "never tried %s, %d steps %s",
+                        target.type().label(),
+                        steps,
+                        target.direction().label()));
     }
 
     private ActionCandidate experiment(

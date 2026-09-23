@@ -2,6 +2,7 @@ package dev.evoworld.core.exploration;
 
 import dev.evoworld.core.SimulationTime;
 import dev.evoworld.core.resource.ResourceType;
+import dev.evoworld.core.world.Chunk;
 import dev.evoworld.core.world.Location;
 import java.util.Objects;
 
@@ -17,19 +18,19 @@ import java.util.Objects;
  *     as opposed to never having seen it here
  */
 public record Discovery(
-        ResourceType what, Location where, Region region, SimulationTime when, boolean firstEver) {
+        ResourceType what, Location where, Chunk chunk, SimulationTime when, boolean firstEver) {
 
     public Discovery {
         Objects.requireNonNull(what, "what");
         Objects.requireNonNull(where, "where");
-        Objects.requireNonNull(region, "region");
+        Objects.requireNonNull(chunk, "chunk");
         Objects.requireNonNull(when, "when");
     }
 
     public String describe() {
         return firstEver
                 ? "first ever sight of " + what.label() + " at " + where
-                : what.label() + " in a new part of the world, " + region + " at " + where;
+                : what.label() + " in a new part of the world, " + chunk + " at " + where;
     }
 
     @Override

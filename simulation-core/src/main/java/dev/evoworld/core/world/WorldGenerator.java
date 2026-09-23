@@ -48,7 +48,24 @@ public final class WorldGenerator {
         }
     }
 
-    /** The standard world for a configuration. */
+    /**
+     * The world a configuration asks for: an endless one that fills itself in
+     * as it is walked into, or a finite one scattered with the standard plan.
+     */
+    public static World forConfig(SimulationConfig config) {
+        Objects.requireNonNull(config, "config");
+        return config.bounds().isEndless()
+                ? endless(config)
+                : generate(config, DEFAULT_PLAN);
+    }
+
+    /** An endless world, generated a chunk at a time from the run's seed. */
+    public static World endless(SimulationConfig config) {
+        return new World(
+                config.bounds(), new ChunkedTerrain(config.seed(), config.chunks()));
+    }
+
+    /** The standard finite world for a configuration. */
     public static World generate(SimulationConfig config) {
         return generate(config, DEFAULT_PLAN);
     }
@@ -75,6 +92,11 @@ public final class WorldGenerator {
         Objects.requireNonNull(plan, "plan");
         Objects.requireNonNull(random, "random");
 
+        if (bounds.isEndless()) {
+            throw new IllegalArgumentException(
+                    "an endless world cannot be scattered all at once; it is generated a chunk "
+                            + "at a time - see WorldGenerator.endless");
+        }
         int requested = plan.stream().mapToInt(ResourcePlan::nodeCount).sum();
         if (requested > bounds.tileCount()) {
             throw new IllegalArgumentException(
@@ -94,9 +116,9 @@ public final class WorldGenerator {
 
     /** Every tile, in a fixed row-major order so the draw below is reproducible. */
     private static List<Location> allTilesIn(WorldBounds bounds) {
-        List<Location> tiles = new ArrayList<>(bounds.tileCount());
-        for (int y = 0; y < bounds.height(); y++) {
-            for (int x = 0; x < bounds.width(); x++) {
+        List<Location> tiles = new ArrayList<>((int) Math.min(Integer.MAX_VALUE, bounds.tileCount()));
+        for (int y = bounds.minY(); y <= bounds.maxY(); y++) {
+            for (int x = bounds.minX(); x <= bounds.maxX(); x++) {
                 tiles.add(new Location(x, y));
             }
         }

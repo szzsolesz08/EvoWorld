@@ -7,6 +7,8 @@ import dev.evoworld.core.agent.AgentId;
 import dev.evoworld.core.agent.MetabolismRates;
 import dev.evoworld.core.agent.Needs;
 import dev.evoworld.core.decision.DeliberativeDecisionMaker;
+import dev.evoworld.core.world.ChunkMix;
+import dev.evoworld.core.world.WorldBounds;
 import dev.evoworld.core.world.World;
 import dev.evoworld.core.world.WorldGenerator;
 import dev.evoworld.core.world.WorldGenerator.ResourcePlan;
@@ -76,14 +78,26 @@ public record Scenario(
 
     public static final Scenario SPARSE = new Scenario(
             "sparse",
-            "half the resource nodes",
+            "hard country: chunks half as rich, and more variable",
             TWENTY_DAYS,
-            SimulationConfig::defaults,
+            seed -> SimulationConfig.defaults(seed)
+                    .withWorld(WorldBounds.endless(), ChunkMix.lean()),
             Needs.healthy(),
-            halved(WorldGenerator.DEFAULT_PLAN));
+            WorldGenerator.DEFAULT_PLAN);
+
+    /** The old world: sixteen tiles square, with walls, generated all at once. */
+    public static final Scenario WALLED = new Scenario(
+            "walled",
+            "a finite 16x16 world, generated whole",
+            TWENTY_DAYS,
+            seed -> SimulationConfig.defaults(seed)
+                    .withWorld(WorldBounds.of(16, 16), ChunkMix.standard()),
+            Needs.healthy(),
+            WorldGenerator.DEFAULT_PLAN);
 
     /** Every scenario, in report order. */
-    public static final List<Scenario> ALL = List.of(BASELINE, HOURLY, WOUNDED, HUNGRY_WORLD, SPARSE);
+    public static final List<Scenario> ALL =
+            List.of(BASELINE, HOURLY, WOUNDED, HUNGRY_WORLD, SPARSE, WALLED);
 
     public Scenario {
         Objects.requireNonNull(name, "name");
@@ -113,7 +127,9 @@ public record Scenario(
      * viewer's with a different tick length.
      */
     public Simulation build(SimulationConfig chosen) {
-        World world = WorldGenerator.generate(chosen, resources);
+        World world = chosen.bounds().isEndless()
+                ? WorldGenerator.endless(chosen)
+                : WorldGenerator.generate(chosen, resources);
         world.addAgent(new Agent(
                 AgentId.of("agent-1"),
                 EvoWorldRunner.FIRST_AGENT_NAME,
@@ -127,6 +143,7 @@ public record Scenario(
                 config.seed(),
                 config.tickDuration(),
                 config.bounds(),
+                config.chunks(),
                 config.perceptionRadius(),
                 body,
                 config.actions());

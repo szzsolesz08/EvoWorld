@@ -2,6 +2,7 @@ package dev.evoworld.core;
 
 import dev.evoworld.core.agent.MetabolismRates;
 import dev.evoworld.core.perception.PerceptionSystem;
+import dev.evoworld.core.world.ChunkMix;
 import dev.evoworld.core.world.WorldBounds;
 import java.time.Duration;
 import java.util.Objects;
@@ -26,6 +27,7 @@ public record SimulationConfig(
         long seed,
         Duration tickDuration,
         WorldBounds bounds,
+        ChunkMix chunks,
         int perceptionRadius,
         MetabolismRates metabolism,
         ActionSettings actions) {
@@ -35,6 +37,7 @@ public record SimulationConfig(
     public SimulationConfig {
         Objects.requireNonNull(tickDuration, "tickDuration");
         Objects.requireNonNull(bounds, "bounds");
+        Objects.requireNonNull(chunks, "chunks");
         Objects.requireNonNull(metabolism, "metabolism");
         Objects.requireNonNull(actions, "actions");
         if (tickDuration.isZero() || tickDuration.isNegative()) {
@@ -50,7 +53,8 @@ public record SimulationConfig(
         return new SimulationConfig(
                 seed,
                 DEFAULT_TICK_DURATION,
-                WorldBounds.of(16, 16),
+                WorldBounds.endless(),
+                ChunkMix.standard(),
                 PerceptionSystem.DEFAULT_RADIUS,
                 MetabolismRates.defaults(),
                 ActionSettings.defaults());
@@ -61,6 +65,7 @@ public record SimulationConfig(
                 newSeed,
                 tickDuration,
                 bounds,
+                chunks,
                 perceptionRadius,
                 metabolism,
                 actions);
@@ -71,6 +76,7 @@ public record SimulationConfig(
                 seed,
                 newTickDuration,
                 bounds,
+                chunks,
                 perceptionRadius,
                 metabolism,
                 actions);
@@ -81,6 +87,7 @@ public record SimulationConfig(
                 seed,
                 tickDuration,
                 newBounds,
+                chunks,
                 perceptionRadius,
                 metabolism,
                 actions);
@@ -88,7 +95,13 @@ public record SimulationConfig(
 
     public SimulationConfig withActions(ActionSettings newActions) {
         return new SimulationConfig(
-                seed, tickDuration, bounds, perceptionRadius, metabolism, newActions);
+                seed, tickDuration, bounds, chunks, perceptionRadius, metabolism, newActions);
+    }
+
+    /** The same configuration in a world of another shape, endless or walled. */
+    public SimulationConfig withWorld(WorldBounds newBounds, ChunkMix newChunks) {
+        return new SimulationConfig(
+                seed, tickDuration, newBounds, newChunks, perceptionRadius, metabolism, actions);
     }
 
     public SimulationConfig withPerceptionRadius(int newRadius) {
@@ -96,6 +109,7 @@ public record SimulationConfig(
                 seed,
                 tickDuration,
                 bounds,
+                chunks,
                 newRadius,
                 metabolism,
                 actions);

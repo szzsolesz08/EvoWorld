@@ -77,6 +77,10 @@ public final class ExploreGoal extends Goal {
      * the spring three steps away. The most pressing need is squared, the same
      * curve the survival goals use, so mild hunger barely dents curiosity and
      * real thirst silences it.
+     *
+     * <p>Silencing it is safe because an agent whose need cannot be met where
+     * it stands has its own reason to travel: see {@code GoLookingProposer},
+     * which offers a journey under the goal of the need itself.
      */
     static double calm(Needs needs) {
         double pressing = Math.max(needs.hunger(), needs.thirst()) / Needs.MAX;

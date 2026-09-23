@@ -4,6 +4,9 @@ import dev.evoworld.core.Simulation;
 import dev.evoworld.core.event.SimulationEvent;
 import dev.evoworld.core.observer.SimulationObserver;
 import dev.evoworld.core.status.AgentStatus;
+import dev.evoworld.core.world.Chunk;
+import dev.evoworld.core.world.Location;
+import dev.evoworld.core.world.ViewWindow;
 import dev.evoworld.core.world.WorldState;
 import java.util.ArrayDeque;
 import java.util.Deque;
@@ -126,6 +129,21 @@ public final class ViewerModel {
 
     public WorldState state() {
         return state;
+    }
+
+    /**
+     * The ground the map shows: the chunk the agent is standing in.
+     *
+     * <p>Not a window that follows the agent about. The view is a piece of the
+     * world, and it changes when the agent walks into the next piece - which is
+     * what lets the same drawing code show somewhere the agent is not, once
+     * there are several agents and somewhere to scroll to.
+     */
+    public ViewWindow windowInView() {
+        return ViewWindow.of(state().agents().stream()
+                .findFirst()
+                .map(agent -> Chunk.containing(agent.location()))
+                .orElseGet(() -> Chunk.containing(new Location(0, 0))));
     }
 
     public AgentStatus status() {

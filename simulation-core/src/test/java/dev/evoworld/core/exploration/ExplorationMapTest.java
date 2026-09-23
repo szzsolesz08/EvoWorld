@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import dev.evoworld.core.SimulationTime;
 import dev.evoworld.core.resource.ResourceType;
+import dev.evoworld.core.world.Chunk;
 import dev.evoworld.core.world.Location;
 import dev.evoworld.core.world.WorldBounds;
 import java.time.Duration;
@@ -55,7 +56,7 @@ class ExplorationMapTest {
             ExplorationMap map = new ExplorationMap();
 
             assertEquals(0, map.regionsVisited());
-            assertEquals(0.0, map.worldFamiliarity(0), EPSILON);
+            assertEquals(0.0, map.familiarityAround(new Location(0, 0), 0), EPSILON);
         }
 
         @Test
@@ -68,8 +69,8 @@ class ExplorationMapTest {
             assertEquals(1.0, map.familiarity(new Region(0, 0), 10), EPSILON);
             assertEquals(0.0, map.familiarity(new Region(1, 0), 10), EPSILON);
             assertEquals(1, map.regionsVisited());
-            assertEquals(16, map.regionCount());
-            assertEquals(1.0 / 16, map.worldFamiliarity(10), EPSILON);
+            assertEquals(16, map.regionsInView(new Location(1, 1)));
+            assertEquals(1.0 / 16, map.familiarityAround(new Location(1, 1), 10), EPSILON);
         }
 
         @Test
@@ -105,7 +106,7 @@ class ExplorationMapTest {
                 }
             }
 
-            List<Region> frontier = map.leastFamiliar(100, 1);
+            List<Region> frontier = map.leastFamiliar(new Location(5, 5), 100, 1);
 
             assertEquals(List.of(new Region(3, 3)), frontier);
         }
@@ -118,7 +119,7 @@ class ExplorationMapTest {
             first.sight(BOUNDS, new Location(5, 5), at(3));
             second.sight(BOUNDS, new Location(5, 5), at(3));
 
-            assertEquals(first.leastFamiliar(50, 6), second.leastFamiliar(50, 6));
+            assertEquals(first.leastFamiliar(new Location(5, 5), 50, 6), second.leastFamiliar(new Location(5, 5), 50, 6));
         }
     }
 
@@ -137,27 +138,28 @@ class ExplorationMapTest {
 
             assertTrue(found.isPresent());
             assertTrue(found.get().firstEver());
-            assertEquals(new Region(0, 0), found.get().region());
+            assertEquals(new Chunk(0, 0), found.get().chunk());
             assertEquals(1L, found.get().when().tick());
         }
 
         @Test
-        @DisplayName("seeing the same kind of thing in the same region again is not news")
+        @DisplayName("seeing the same kind of thing in the same chunk again is not news")
         void repeatsAreNotDiscoveries() {
             ExplorationMap map = new ExplorationMap();
             map.notice(new Location(1, 1), ResourceType.WATER, at(1));
 
             assertTrue(map.notice(new Location(2, 2), ResourceType.WATER, at(5)).isEmpty());
+            assertTrue(map.notice(new Location(40, 33), ResourceType.WATER, at(9)).isEmpty());
         }
 
         @Test
-        @DisplayName("finding a known kind of thing somewhere new is a discovery, but not a first")
+        @DisplayName("finding a known kind of thing in a new chunk is a discovery, but not a first")
         void newPlaceIsADiscoveryButNotAFirst() {
             ExplorationMap map = new ExplorationMap();
             map.notice(new Location(1, 1), ResourceType.WATER, at(1));
 
             Optional<Discovery> elsewhere =
-                    map.notice(new Location(13, 13), ResourceType.WATER, at(9));
+                    map.notice(new Location(80, 13), ResourceType.WATER, at(9));
 
             assertTrue(elsewhere.isPresent());
             assertFalse(elsewhere.get().firstEver());

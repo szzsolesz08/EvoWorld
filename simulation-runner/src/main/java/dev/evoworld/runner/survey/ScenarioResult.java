@@ -123,6 +123,13 @@ public record ScenarioResult(Scenario scenario, long ticks, List<SeedResult> see
         return lived <= 0.0 ? 0.0 : Math.max(0.0, 1.0 - upkeep / lived);
     }
 
+    /** How much country a life covers, averaged over the seeds. */
+    public double chunksPerRun() {
+        return seeds.isEmpty()
+                ? 0.0
+                : seeds.stream().mapToInt(SeedResult::chunksEntered).average().orElse(0.0);
+    }
+
     private double perDay(double total) {
         double days = seeds.stream().mapToDouble(SeedResult::days).sum();
         return days <= 0.0 ? 0.0 : total / days;

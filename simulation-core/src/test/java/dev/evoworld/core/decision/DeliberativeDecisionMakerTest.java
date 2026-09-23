@@ -15,6 +15,7 @@ import dev.evoworld.core.action.SleepAction;
 import dev.evoworld.core.agent.Agent;
 import dev.evoworld.core.agent.AgentId;
 import dev.evoworld.core.agent.Needs;
+import dev.evoworld.core.exploration.Region;
 import dev.evoworld.core.goal.Motivation;
 import dev.evoworld.core.goal.MotivationSystem;
 import dev.evoworld.core.goal.RecoverHealthGoal;
@@ -89,12 +90,17 @@ class DeliberativeDecisionMakerTest {
             return this;
         }
 
-        /** Has stood in every part of the world, just now: nothing left to find out. */
+        /**
+         * Has just walked every part of the country around it: nothing left to
+         * find out. Around it, not the whole world - the world has no edges
+         * any more, and an agent that had to see all of it would never be
+         * anything but restless.
+         */
         Situation knowingTheWorld() {
-            for (int x = 0; x < CONFIG.bounds().width(); x += 4) {
-                for (int y = 0; y < CONFIG.bounds().height(); y += 4) {
-                    agent.exploration().sight(CONFIG.bounds(), new Location(x, y), NOW);
-                }
+            int window = agent.exploration().regionsInView(agent.location());
+            for (Region region :
+                    agent.exploration().leastFamiliar(agent.location(), NOW.tick(), window)) {
+                agent.exploration().sight(CONFIG.bounds(), region.centre(), NOW);
             }
             return this;
         }
@@ -461,14 +467,22 @@ class DeliberativeDecisionMakerTest {
         @Test
         @DisplayName("an agent only ever chooses from what it can actually see")
         void choicesAreBoundedByPerception() {
-            // Water exists, far outside the perception radius of six.
-            Deliberation deliberation =
-                    situation().body(0, 90, 100).with(ResourceType.WATER, 15, 15).decide();
+            Location unseen = new Location(
+                    MIDDLE.x() + CONFIG.perceptionRadius() + 4, MIDDLE.y());
+            Deliberation deliberation = situation()
+                    .body(0, 90, 100)
+                    .with(ResourceType.WATER, unseen.x(), unseen.y())
+                    .decide();
 
+            // A thirsty agent with nothing in reach may well set off looking -
+            // that is what thirst is for. What it must not do is walk to a
+            // spring it has no way of knowing about.
             assertTrue(
                     deliberation.considered().stream()
-                            .noneMatch(d -> d.rationale().contains("satisfy thirst")),
-                    "unseen water must not be a candidate: " + deliberation.considered());
+                            .map(Decision::action)
+                            .filter(action -> action instanceof MoveAction)
+                            .noneMatch(action -> ((MoveAction) action).destination().equals(unseen)),
+                    "unseen water must not be a destination: " + deliberation.considered());
         }
 
         @Test

@@ -24,6 +24,8 @@ import dev.evoworld.core.resource.ResourceSnapshot;
 import dev.evoworld.core.resource.ResourceType;
 import dev.evoworld.core.status.AgentStatus;
 import dev.evoworld.core.world.AgentSnapshot;
+import dev.evoworld.core.world.Chunk;
+import dev.evoworld.core.world.ViewWindow;
 import dev.evoworld.core.world.Location;
 import dev.evoworld.core.world.WorldState;
 import dev.evoworld.persistence.SaveFile;
@@ -120,7 +122,9 @@ final class ViewerScreen extends ApplicationAdapter {
         float width = camera.viewportWidth;
         float height = camera.viewportHeight;
         WorldState state = model.state();
-        MapLayout layout = MapLayout.fit(state.bounds(), width, height);
+        // One chunk at a time: the one the agent is standing in. When it walks
+        // over the edge the view moves with it, a chunk at a step.
+        MapLayout layout = MapLayout.fit(model.windowInView(), width, height);
 
         Gdx.gl.glEnable(GL20.GL_BLEND);
         Gdx.gl.glBlendFunc(GL20.GL_SRC_ALPHA, GL20.GL_ONE_MINUS_SRC_ALPHA);
@@ -205,9 +209,9 @@ final class ViewerScreen extends ApplicationAdapter {
         float gap = Math.max(1f, layout.tile() * 0.06f);
 
         shapes.begin(ShapeRenderer.ShapeType.Filled);
-        for (int y = 0; y < state.bounds().height(); y++) {
-            for (int x = 0; x < state.bounds().width(); x++) {
-                Location tile = new Location(x, y);
+        for (int row = 0; row < layout.window().down(); row++) {
+            for (int column = 0; column < layout.window().across(); column++) {
+                Location tile = layout.window().tileAt(column, row);
                 boolean seen = atlas.alive() && tile.manhattanDistanceTo(atlas.location()) <= radius;
                 shapes.setColor(seen ? IN_SIGHT : GROUND);
                 shapes.rect(layout.left(tile) + gap / 2, layout.bottom(tile) + gap / 2,
@@ -215,7 +219,7 @@ final class ViewerScreen extends ApplicationAdapter {
             }
         }
         for (ResourceSnapshot node : state.resources()) {
-            if (node.isAvailable()) {
+            if (node.isAvailable() && layout.window().contains(node.location())) {
                 // Area in proportion to what is left, so a half-picked bush looks half full.
                 float side = layout.tile() * 0.72f * (float) Math.sqrt(node.availability());
                 shapes.setColor(colourOf(node.type()));
@@ -227,6 +231,9 @@ final class ViewerScreen extends ApplicationAdapter {
 
         shapes.begin(ShapeRenderer.ShapeType.Line);
         for (ResourceSnapshot node : state.resources()) {
+            if (!layout.window().contains(node.location())) {
+                continue;
+            }
             float side = layout.tile() * 0.72f;
             Color edge = colourOf(node.type());
             shapes.setColor(edge.r, edge.g, edge.b, node.isAvailable() ? 0.9f : 0.5f);
@@ -358,6 +365,8 @@ final class ViewerScreen extends ApplicationAdapter {
         AgentSnapshot body = status.body();
         font.setColor(body.alive() ? ATLAS : DIM);
         font.draw(batch, body.name() + (body.alive() ? "" : " (dead)") + "  at " + body.location(), x, y);
+        font.setColor(DIM);
+        font.draw(batch, Chunk.containing(body.location()).toString(), x, y, panelWidth(), Align.right, false);
 
         float barsTop = height - MapLayout.MARGIN - HEADER_HEIGHT;
         List<Bar> bars = bars(body.needs());
@@ -394,7 +403,8 @@ final class ViewerScreen extends ApplicationAdapter {
     private static List<String[]> rows(AgentStatus status, Simulation simulation) {
         List<String> lines = StatusReport.lines(status, simulation.config().tickDuration());
         List<String> wanted = List.of(
-                "wants", "doing", "last act", "intent", "carrying", "knows", "skills", "explored");
+                "wants", "doing", "last act", "intent", "carrying", "knows", "skills", "plenty",
+                "explored");
         return lines.stream()
                 .skip(1)
                 .filter(line -> line.length() > 14)

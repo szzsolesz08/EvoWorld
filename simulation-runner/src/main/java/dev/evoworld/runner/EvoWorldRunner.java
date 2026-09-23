@@ -133,7 +133,7 @@ public final class EvoWorldRunner {
      * an AI to drive it.
      */
     public static Simulation buildSimulation(SimulationConfig config, boolean scripted) {
-        World world = WorldGenerator.generate(config);
+        World world = WorldGenerator.forConfig(config);
         Location start = config.bounds().center();
         world.addAgent(Agent.spawn("agent-1", FIRST_AGENT_NAME, start));
 

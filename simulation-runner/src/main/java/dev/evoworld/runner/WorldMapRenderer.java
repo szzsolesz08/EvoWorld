@@ -4,6 +4,7 @@ import dev.evoworld.core.resource.ResourceSnapshot;
 import dev.evoworld.core.resource.ResourceType;
 import dev.evoworld.core.world.AgentSnapshot;
 import dev.evoworld.core.world.Location;
+import dev.evoworld.core.world.ViewWindow;
 import dev.evoworld.core.world.WorldState;
 import java.util.ArrayList;
 import java.util.EnumMap;
@@ -38,34 +39,46 @@ public final class WorldMapRenderer {
         return lines;
     }
 
+    /** How much ground a printed map shows: a couple of hours' walk across. */
+    private static final int ACROSS = 41;
+    private static final int DOWN = 21;
+
     private static String header(WorldState state) {
         return String.format(
                 Locale.ROOT,
-                "world %s at %s - %d resource node(s), %d agent(s)",
+                "world %s at %s - %d resource node(s) in view of %d agent(s), around %s",
                 state.bounds(),
                 state.time(),
                 state.resources().size(),
-                state.agents().size());
+                state.agents().size(),
+                focus(state));
+    }
+
+    /** Where the map is drawn around: the first agent, or the origin if there is none. */
+    private static Location focus(WorldState state) {
+        return state.agents().stream().findFirst().map(agent -> agent.location()).orElse(new Location(0, 0));
     }
 
     private static List<String> grid(WorldState state) {
-        int width = state.bounds().width();
-        int height = state.bounds().height();
+        // A world with no edges cannot be printed whole, so this prints the
+        // ground around whoever is in it.
+        ViewWindow window = ViewWindow.around(focus(state), ACROSS, DOWN, state.bounds());
 
-        List<String> lines = new ArrayList<>(height + 1);
-        StringBuilder axis = new StringBuilder("    ");
-        for (int x = 0; x < width; x++) {
+        List<String> lines = new ArrayList<>(window.down() + 1);
+        StringBuilder axis = new StringBuilder("       ");
+        for (int column = 0; column < window.across(); column++) {
             // Only the last digit fits, which is enough to count along a row.
-            axis.append(x % 10).append(' ');
+            axis.append(Math.floorMod(window.tileAt(column, 0).x(), 10)).append(' ');
         }
         lines.add(axis.toString());
 
-        for (int y = 0; y < height; y++) {
-            StringBuilder row = new StringBuilder(String.format(Locale.ROOT, "%3d ", y));
-            for (int x = 0; x < width; x++) {
-                row.append(symbolAt(state, new Location(x, y))).append(' ');
+        for (int row = 0; row < window.down(); row++) {
+            StringBuilder line = new StringBuilder(
+                    String.format(Locale.ROOT, "%6d ", window.tileAt(0, row).y()));
+            for (int column = 0; column < window.across(); column++) {
+                line.append(symbolAt(state, window.tileAt(column, row))).append(' ');
             }
-            lines.add(row.toString());
+            lines.add(line.toString());
         }
         return lines;
     }

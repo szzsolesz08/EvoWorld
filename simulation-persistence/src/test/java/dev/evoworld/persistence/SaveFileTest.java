@@ -33,7 +33,7 @@ class SaveFileTest {
 
     private static Simulation fresh(long seed) {
         SimulationConfig config = SimulationConfig.defaults(seed);
-        World world = WorldGenerator.generate(config);
+        World world = WorldGenerator.forConfig(config);
         world.addAgent(Agent.spawn("agent-1", "Atlas", config.bounds().center()));
         return new Simulation(world, DeliberativeDecisionMaker.from(config), config);
     }

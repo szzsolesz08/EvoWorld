@@ -1,6 +1,7 @@
 package dev.evoworld.core.save;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -64,7 +65,7 @@ class SaveAndContinueTest {
 
     private static Simulation fresh(long seed) {
         SimulationConfig config = SimulationConfig.defaults(seed);
-        World world = WorldGenerator.generate(config);
+        World world = WorldGenerator.forConfig(config);
         world.addAgent(Agent.spawn("agent-1", "Atlas", config.bounds().center()));
         return new Simulation(world, DeliberativeDecisionMaker.from(config), config);
     }
@@ -221,7 +222,7 @@ class SaveAndContinueTest {
 
     private static Simulation hurt(long seed) {
         SimulationConfig config = SimulationConfig.defaults(seed);
-        World world = WorldGenerator.generate(config);
+        World world = WorldGenerator.forConfig(config);
         world.addAgent(new Agent(
                 AgentId.of("agent-1"), "Atlas", config.bounds().center(),
                 new Needs(0.0, 0.0, 100.0, 30.0)));
@@ -266,7 +267,10 @@ class SaveAndContinueTest {
         assertEquals(600L, saved.tick(), "simulation time");
         assertEquals(7L, saved.config().seed(), "seed");
         assertTrue(saved.randomState() >= 0L, "generator state");
-        assertEquals(16, saved.resources().size(), "world state");
+        // An endless world is saved as the chunks the run has actually met,
+        // plus whatever in them is no longer what the terrain would build.
+        // Counting nodes would be counting the seed back to itself.
+        assertFalse(saved.chunks().isEmpty(), "the ground it has walked");
         assertTrue(agent.health() > 0.0, "needs");
         assertTrue(!agent.memories().isEmpty(), "memories");
         assertTrue(!agent.beliefs().isEmpty(), "knowledge");
@@ -288,6 +292,7 @@ class SaveAndContinueTest {
                 current.randomDraws(),
                 current.announced(),
                 current.resources(),
+                current.chunks(),
                 current.agents());
 
         assertThrows(IllegalArgumentException.class, () -> Simulation.load(future));
@@ -305,5 +310,45 @@ class SaveAndContinueTest {
         resumed.run(10);
 
         assertTrue(transcript.lines.stream().noneMatch(line -> line.contains("came into the world")));
+    }
+
+    @Test
+    @DisplayName("a save stays small however far it has walked: chunks, not their contents")
+    void savesDoNotGrowWithTheWorld() {
+        Simulation walked = fresh(7L);
+        walked.run(1500);
+
+        SavedSimulation saved = walked.save();
+        long nodesInTheWorld = walked.world().resources().size();
+
+        assertFalse(saved.chunks().isEmpty(), "it has met some country");
+        // A chunk can be built again from the seed, so only what is no longer
+        // what the seed would build has to be written down. A save that listed
+        // every bush would grow without limit as the agent walked.
+        assertTrue(
+                saved.resources().size() < nodesInTheWorld / 4,
+                saved.resources().size() + " nodes saved for " + nodesInTheWorld + " in the world");
+    }
+
+    @Test
+    @DisplayName("a run resumed mid-walk goes on into country neither half had seen")
+    void resumingCarriesOnIntoNewCountry() {
+        Simulation unbroken = fresh(3L);
+        unbroken.run(1200);
+
+        Simulation before = fresh(3L);
+        before.run(600);
+        Simulation resumed = Simulation.load(before.save());
+        int chunksAtTheBreak = resumed.world().chunkCount();
+        resumed.run(600);
+
+        assertEquals(unbroken.snapshot(), resumed.snapshot());
+        assertTrue(
+                resumed.world().chunkCount() > chunksAtTheBreak,
+                "it should have walked into new country after loading");
+        assertEquals(
+                unbroken.world().chunkCount(),
+                resumed.world().chunkCount(),
+                "and met exactly the country it would have met");
     }
 }

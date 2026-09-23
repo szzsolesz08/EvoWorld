@@ -35,6 +35,7 @@ import dev.evoworld.core.status.AgentStatus;
 import dev.evoworld.core.skill.Skills;
 import dev.evoworld.core.world.Location;
 import dev.evoworld.core.world.World;
+import dev.evoworld.core.world.WorldGenerator;
 import dev.evoworld.core.world.WorldState;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -277,8 +278,9 @@ public final class Simulation {
                             .filter(belief -> !belief.isAssumed())
                             .toList(),
                     agent.skills(),
-                    agent.exploration().regionsVisited(),
-                    agent.exploration().regionCount()));
+                    agent.exploration().visitedInView(agent.location()),
+                    agent.exploration().regionsInView(agent.location()),
+                    PerceptionSystem.plentyAround(agent.exploration(), agent.location(), now)));
         }
         return List.copyOf(report);
     }
@@ -311,7 +313,8 @@ public final class Simulation {
                 random.state(),
                 random.drawCount(),
                 announced,
-                world.resources().stream().map(SaveFormat::save).toList(),
+                world.generatesItself() ? List.of() : world.resources().stream().map(SaveFormat::save).toList(),
+                world.generatesItself() ? SaveFormat.saveChunks(world, config) : List.of(),
                 agents);
     }
 
@@ -336,8 +339,12 @@ public final class Simulation {
         }
         SimulationConfig config = SaveFormat.load(saved.config());
 
-        World world = new World(config.bounds());
-        saved.resources().forEach(resource -> world.addResource(SaveFormat.load(resource)));
+        World world = WorldGenerator.forConfig(config);
+        if (world.generatesItself()) {
+            SaveFormat.restoreChunks(world, saved.chunks(), config);
+        } else {
+            saved.resources().forEach(resource -> world.addResource(SaveFormat.load(resource)));
+        }
         for (SavedAgent agent : saved.agents()) {
             world.addAgent(SaveFormat.load(agent, config.bounds()));
         }
@@ -373,8 +380,14 @@ public final class Simulation {
         SimulationTime now = clock.advance();
         notifyAll(observer -> observer.onTickStarted(now.tick()));
 
-        // 2. update the environment
-        world.regenerateResources(config.tickDuration());
+        // 2. update the environment: ground near anybody keeps growing, and
+        // ground nobody is near catches up when somebody comes back.
+        List<Location> whereEveryoneIs = world.agents().stream()
+                .filter(Agent::isAlive)
+                .map(Agent::location)
+                .toList();
+        world.regenerateResources(
+                config.tickDuration(), whereEveryoneIs, config.perceptionRadius(), now.tick());
 
         for (Agent agent : world.agents()) {
             if (!agent.isAlive()) {
@@ -475,6 +488,10 @@ public final class Simulation {
     private Action decide(Agent agent, SimulationTime now) {
         long tick = now.tick();
         settleIntent(agent, tick);
+
+        // The ground an agent is about to look at has to exist first. In an
+        // endless world this is where it comes into being, a chunk at a time.
+        world.ensureAround(agent.location(), config.perceptionRadius(), tick);
 
         // 4, 5. perceive, with relevant memories recalled alongside
         Perception perception = senses.perceive(agent, world, now);
@@ -626,8 +643,8 @@ public final class Simulation {
                     (int) agent.knowledge().beliefs().stream()
                             .filter(belief -> !belief.isAssumed())
                             .count(),
-                    agent.exploration().regionsVisited(),
-                    agent.exploration().regionCount(),
+                    agent.exploration().visitedInView(agent.location()),
+                    agent.exploration().regionsInView(agent.location()),
                     agent.skills().toString()));
         }
     }

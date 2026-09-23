@@ -13,6 +13,8 @@ import dev.evoworld.core.world.Location;
 import dev.evoworld.core.world.World;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.List;
 import java.util.Objects;
 
@@ -38,7 +40,12 @@ import java.util.Objects;
 public final class PerceptionSystem {
 
     /** Roughly a third of the way across the default world. */
-    public static final int DEFAULT_RADIUS = 6;
+    /**
+     * How far an agent can tell what is around it, in steps: about two hours'
+     * walk. Wide enough to make sense of a 64-tile chunk without having to
+     * cross it six tiles at a time.
+     */
+    public static final int DEFAULT_RADIUS = 12;
 
     /** How many unknown corners an agent weighs at once. */
     private static final int FRONTIER_SIZE = 4;
@@ -69,8 +76,7 @@ public final class PerceptionSystem {
 
         Location here = agent.location();
 
-        List<PerceivedResource> resources = world.resources().stream()
-                .filter(node -> isWithinRange(here, node.location()))
+        List<PerceivedResource> resources = world.resourcesNear(here, radius).stream()
                 .map(node -> PerceivedResource.seenFrom(here, node.snapshot()))
                 .sorted(nearestFirst(
                         PerceivedResource::stepsAway, PerceivedResource::location))
@@ -87,8 +93,11 @@ public final class PerceptionSystem {
                 recallPlacesOutOfSight(agent.memory(), here, time, resources);
 
         // Standing somewhere is how it becomes familiar, so coverage is
-        // updated as part of looking rather than as part of moving.
+        // updated as part of looking rather than as part of moving. What is in
+        // view is also counted up by region: how much was where is worth
+        // remembering, and this is the moment it is known.
         agent.exploration().sight(world.bounds(), here, time);
+        noteWhatIsAbout(agent.exploration(), resources, time);
 
         return new Perception(
                 time,
@@ -112,15 +121,52 @@ public final class PerceptionSystem {
      */
     private ExplorationView surveyOf(ExplorationMap map, Location here, SimulationTime time) {
         List<UnexploredArea> frontier = new ArrayList<>();
-        for (Region region : map.leastFamiliar(time.tick(), FRONTIER_SIZE)) {
+        for (Region region : map.leastFamiliar(here, time.tick(), FRONTIER_SIZE)) {
             frontier.add(
                     UnexploredArea.seenFrom(here, region, map.familiarity(region, time.tick())));
         }
         return new ExplorationView(
                 frontier,
-                map.worldFamiliarity(time.tick()),
-                map.regionsVisited(),
-                map.regionCount());
+                map.familiarityAround(here, time.tick()),
+                map.visitedInView(here),
+                map.regionsInView(here),
+                plentyAround(map, here, time));
+    }
+
+    /** Counts what is in view by region, so the agent remembers where things are thick on the ground. */
+    private static void noteWhatIsAbout(
+            ExplorationMap map, List<PerceivedResource> inView, SimulationTime time) {
+        Map<Region, Map<ResourceType, Integer>> counted = new LinkedHashMap<>();
+        for (PerceivedResource seen : inView) {
+            if (!seen.isAvailable()) {
+                continue;
+            }
+            counted.computeIfAbsent(Region.containing(seen.location()), region -> new LinkedHashMap<>())
+                    .merge(seen.type(), 1, Integer::sum);
+        }
+        counted.forEach((region, counts) ->
+                counts.forEach((type, count) -> map.sawPlenty(region, type, count, time)));
+    }
+
+    /** Everywhere nearby the agent remembers plenty, richest and nearest first. */
+    public static List<KnownPlenty> plentyAround(
+            ExplorationMap map, Location here, SimulationTime time) {
+        List<KnownPlenty> plenty = new ArrayList<>();
+        for (ExplorationMap.RegionRecord record : map.plentyAround(here)) {
+            record.plenty().forEach((type, seen) -> plenty.add(KnownPlenty.seenFrom(
+                    here,
+                    record.region(),
+                    type,
+                    seen.count(),
+                    map.abundance(record.region(), type, time.tick()),
+                    time.tick() - seen.tick())));
+        }
+        return plenty.stream()
+                .sorted(java.util.Comparator
+                        .comparingDouble((KnownPlenty known) -> -known.belief() / (1 + known.stepsAway()))
+                        .thenComparingInt(KnownPlenty::stepsAway)
+                        .thenComparing(known -> known.type().name()))
+                .toList();
     }
 
     /**

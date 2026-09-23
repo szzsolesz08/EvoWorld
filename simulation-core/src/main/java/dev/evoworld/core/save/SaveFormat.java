@@ -29,9 +29,15 @@ import dev.evoworld.core.memory.MemoryStore;
 import dev.evoworld.core.resource.ResourceNode;
 import dev.evoworld.core.resource.ResourceType;
 import dev.evoworld.core.skill.Skills;
+import dev.evoworld.core.world.ChunkMix;
+import dev.evoworld.core.world.Chunk;
+import dev.evoworld.core.world.ChunkedTerrain;
+import dev.evoworld.core.world.Terrain;
+import dev.evoworld.core.world.World;
 import dev.evoworld.core.world.Location;
 import dev.evoworld.core.world.WorldBounds;
 import java.time.Duration;
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -63,8 +69,11 @@ public final class SaveFormat {
         return new SavedConfig(
                 config.seed(),
                 config.tickDuration().toString(),
-                config.bounds().width(),
-                config.bounds().height(),
+                config.bounds().minX(),
+                config.bounds().minY(),
+                config.bounds().maxX(),
+                config.bounds().maxY(),
+                saveMix(config.chunks()),
                 config.perceptionRadius(),
                 new SavedMetabolism(
                         body.hunger(),
@@ -94,7 +103,8 @@ public final class SaveFormat {
         return new SimulationConfig(
                 saved.seed(),
                 Duration.parse(saved.tickDuration()),
-                WorldBounds.of(saved.width(), saved.height()),
+                new WorldBounds(saved.minX(), saved.minY(), saved.maxX(), saved.maxY()),
+                loadMix(saved.chunks()),
                 saved.perceptionRadius(),
                 new MetabolismRates(
                         body.hunger(),
@@ -116,6 +126,67 @@ public final class SaveFormat {
                         actions.gatherMinutes(),
                         actions.eatPortion(),
                         actions.drinkGulp()));
+    }
+
+    static SavedChunkMix saveMix(ChunkMix mix) {
+        Map<String, Integer> average = new LinkedHashMap<>();
+        mix.average().forEach((type, count) -> average.put(type.name(), count));
+        return new SavedChunkMix(average, mix.leanest(), mix.richest());
+    }
+
+    static ChunkMix loadMix(SavedChunkMix saved) {
+        Map<ResourceType, Integer> average = new LinkedHashMap<>();
+        saved.average().forEach((name, count) -> average.put(ResourceType.valueOf(name), count));
+        return new ChunkMix(average, saved.leanest(), saved.richest());
+    }
+
+    // --- chunks -----------------------------------------------------------
+
+    /**
+     * The chunks a generated world has, each with only what has changed in it.
+     *
+     * <p>Everything else the terrain can build again from the seed, so a save
+     * stays small however far an agent has walked.
+     */
+    public static List<SavedChunk> saveChunks(World world, SimulationConfig config) {
+        Terrain terrain = new ChunkedTerrain(config.seed(), config.chunks());
+        List<SavedChunk> saved = new ArrayList<>();
+        for (Chunk chunk : world.chunks()) {
+            Map<Location, ResourceNode> asGenerated = new LinkedHashMap<>();
+            terrain.generate(chunk).forEach(node -> asGenerated.put(node.location(), node));
+
+            List<SavedResource> changed = new ArrayList<>();
+            for (ResourceNode node : world.resources()) {
+                if (!chunk.contains(node.location())) {
+                    continue;
+                }
+                ResourceNode generated = asGenerated.remove(node.location());
+                if (generated == null || generated.quantity() != node.quantity()) {
+                    changed.add(save(node));
+                }
+            }
+            // Anything the terrain would put here that is no longer here at all
+            // is saved as an empty node, so loading does not bring it back.
+            asGenerated.values().forEach(missing ->
+                    changed.add(save(ResourceNode.holding(missing.type(), missing.location(), 0.0))));
+            saved.add(new SavedChunk(chunk.column(), chunk.row(), world.regrownTo(chunk), changed));
+        }
+        return List.copyOf(saved);
+    }
+
+    /** Rebuilds each saved chunk from the terrain, then applies what had changed. */
+    public static void restoreChunks(World world, List<SavedChunk> chunks, SimulationConfig config) {
+        Terrain terrain = new ChunkedTerrain(config.seed(), config.chunks());
+        for (SavedChunk saved : chunks) {
+            Chunk chunk = new Chunk(saved.column(), saved.row());
+            Map<Location, ResourceNode> nodes = new LinkedHashMap<>();
+            terrain.generate(chunk).forEach(node -> nodes.put(node.location(), node));
+            saved.changed().forEach(resource -> {
+                ResourceNode node = load(resource);
+                nodes.put(node.location(), node);
+            });
+            world.restoreChunk(chunk, List.copyOf(nodes.values()), saved.regrownTo());
+        }
     }
 
     // --- the world --------------------------------------------------------
@@ -180,7 +251,13 @@ public final class SaveFormat {
                                 record.region().column(),
                                 record.region().row(),
                                 record.lastSeenTick(),
-                                record.found()))
+                                record.found(),
+                                record.plenty().entrySet().stream()
+                                        .map(seen -> new SavedRegion.SavedPlenty(
+                                                seen.getKey(),
+                                                seen.getValue().count(),
+                                                seen.getValue().tick()))
+                                        .toList()))
                         .toList(),
                 underway == null ? null : save(underway),
                 underwayTicksRemaining,
@@ -195,6 +272,14 @@ public final class SaveFormat {
                                 intent.formedAtTick(),
                                 intent.startingDistance()))
                         .orElse(null));
+    }
+
+    /** What a saved region remembers of how much was there, by kind. */
+    private static Map<ResourceType, ExplorationMap.Seen> plentyOf(SavedRegion region) {
+        Map<ResourceType, ExplorationMap.Seen> plenty = new EnumMap<>(ResourceType.class);
+        region.plenty().forEach(seen ->
+                plenty.put(seen.type(), new ExplorationMap.Seen(seen.count(), seen.tick())));
+        return plenty;
     }
 
     /** The agent itself; what the simulation held for it is read by the simulation. */
@@ -221,7 +306,8 @@ public final class SaveFormat {
                         .map(region -> new ExplorationMap.RegionRecord(
                                 new Region(region.column(), region.row()),
                                 region.lastSeenTick(),
-                                region.found()))
+                                region.found(),
+                                plentyOf(region)))
                         .toList());
 
         return Agent.restored(

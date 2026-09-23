@@ -138,6 +138,11 @@ public record Perception(
         return exploration.unexploredFraction();
     }
 
+    /** Everywhere nearby the agent remembers plenty of something. */
+    public List<KnownPlenty> plenty() {
+        return exploration.plenty();
+    }
+
     /** One readable line per thing sensed, nearest first. */
     public List<String> describe() {
         List<String> lines =

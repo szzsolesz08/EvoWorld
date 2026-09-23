@@ -70,8 +70,21 @@ public final class GatherProposer implements ActionProposer {
         return List.of(new ActionCandidate(
                 new GatherAction(node.type(), haul, energyCost, ticks),
                 SatisfyHungerGoal.NAME,
+                // Valued at what the bush can do for this hunger, not at one
+                // armful: the same measure as walking to a bush somewhere else,
+                // so standing on one never looks worse than a trip to one. This
+                // is the rule DrinkProposer already follows. Without it the
+                // bush over there always beat the bush underfoot, and an agent
+                // walked between two of them until it died of thirst.
                 ExpectedRelief.fromEating(
-                        perception.knowledge(), perception.needs(), node.type(), wouldGet),
+                        perception.knowledge(),
+                        perception.needs(),
+                        node.type(),
+                        UntestedGuess.unitsExpected(
+                                perception.knowledge(),
+                                BeliefKind.NOURISHMENT,
+                                node.type(),
+                                node.quantity())),
                 sureness,
                 0,
                 energyCost,

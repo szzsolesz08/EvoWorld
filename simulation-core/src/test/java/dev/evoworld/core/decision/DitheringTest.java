@@ -84,11 +84,11 @@ class DitheringTest {
     @DisplayName("a bush in sight is never worth less than the same bush remembered")
     void seeingIsNoWorseThanRemembering() {
         World world = new World(CONFIG.bounds());
-        Location bush = new Location(8, 2);
+        Location bush = new Location(8, 8 - RADIUS);
         world.addResource(ResourceNode.full(ResourceType.BERRIES, bush));
         Agent agent = hungryAgentAt(new Location(8, 8));
         PerceptionSystem sharp = new PerceptionSystem(RADIUS);
-        // The same bush, the same six steps away, just past the edge of sight.
+        // The same bush, the same distance away, just past the edge of sight.
         PerceptionSystem shortSighted = new PerceptionSystem(RADIUS - 1);
         lookAround(agent, world, sharp, 1);
 
