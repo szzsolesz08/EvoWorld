@@ -42,7 +42,8 @@ public final class MotivationSystem {
                 new SatisfyHungerGoal(),
                 new RecoverEnergyGoal(),
                 new RecoverHealthGoal(),
-                new ExploreGoal()));
+                new ExploreGoal(),
+                new StayProvisionedGoal()));
     }
 
     public List<Goal> goals() {

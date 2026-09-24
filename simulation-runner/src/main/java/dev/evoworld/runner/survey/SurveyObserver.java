@@ -3,6 +3,8 @@ package dev.evoworld.runner.survey;
 import dev.evoworld.core.action.ActionOutcome;
 import dev.evoworld.core.action.DrinkAction;
 import dev.evoworld.core.action.EatAction;
+import dev.evoworld.core.action.CraftAction;
+import dev.evoworld.core.action.MoveAction;
 import dev.evoworld.core.action.RestAction;
 import dev.evoworld.core.action.SleepAction;
 import dev.evoworld.core.agent.AgentId;
@@ -81,6 +83,9 @@ public final class SurveyObserver implements SimulationObserver {
     private long lastMealTick = Long.MIN_VALUE;
     private long lastDrinkTick = Long.MIN_VALUE;
     private int upkeepTicks;
+    /** Ticks spent walking for water: the cost this milestone set out to cut. */
+    private int waterWalkTicks;
+    private int crafts;
 
     /** Which country it has been in: how much of an endless world one life covers. */
     private final Set<Chunk> chunksEntered = new LinkedHashSet<>();
@@ -129,12 +134,19 @@ public final class SurveyObserver implements SimulationObserver {
         if (isUpkeep(chosen)) {
             upkeepTicks += ticks;
         }
+        if (chosen.action().name().equals(MoveAction.NAME)
+                && chosen.goalName().filter(SatisfyThirstGoal.NAME::equals).isPresent()) {
+            waterWalkTicks += ticks;
+        }
     }
 
     @Override
     public void onActionPerformed(long tick, AgentId agentId, ActionOutcome outcome) {
         if (outcome.succeeded() && outcome.actionName().equals(RestAction.NAME)) {
             rests++;
+        }
+        if (outcome.succeeded() && outcome.actionName().equals(CraftAction.NAME)) {
+            crafts++;
         }
         if (outcome.succeeded() && outcome.actionName().equals(EatAction.NAME)) {
             if (tick != lastMealTick + 1) {
@@ -293,6 +305,8 @@ public final class SurveyObserver implements SimulationObserver {
                 meals,
                 drinks,
                 upkeepTicks * tickHours,
-                chunksEntered.size());
+                chunksEntered.size(),
+                waterWalkTicks * tickHours,
+                crafts);
     }
 }

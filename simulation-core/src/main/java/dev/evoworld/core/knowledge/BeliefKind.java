@@ -33,7 +33,18 @@ public enum BeliefKind {
      * <p>Not about any one place - that is memory's job - but about whether
      * this kind of thing tends to still be there when you arrive.
      */
-    LOCATION_RELIABILITY(0.6, "chance it is still there");
+    LOCATION_RELIABILITY(0.6, "chance it is still there"),
+
+    /**
+     * Whether a made thing turns out to be worth having.
+     *
+     * <p>The subject is a kind of item rather than a resource, which the
+     * belief store already allows: what is learned about a flask is learned
+     * the same way as what is learned about berries, by having one and seeing
+     * whether it helped. The prior is a hunch that a thing you can make
+     * probably does something, which is what makes a first one worth the wood.
+     */
+    USEFULNESS(0.5, "worth having");
 
     private final double prior;
     private final String unit;

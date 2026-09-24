@@ -10,12 +10,15 @@ import dev.evoworld.core.decision.proposal.DiscardProposer;
 import dev.evoworld.core.decision.proposal.DrinkProposer;
 import dev.evoworld.core.decision.proposal.EatProposer;
 import dev.evoworld.core.decision.proposal.ExploreProposer;
+import dev.evoworld.core.decision.proposal.CraftProposer;
+import dev.evoworld.core.decision.proposal.FetchMaterialsProposer;
 import dev.evoworld.core.decision.proposal.GatherProposer;
 import dev.evoworld.core.decision.proposal.GoLookingProposer;
 import dev.evoworld.core.decision.proposal.HeadForPlentyProposer;
 import dev.evoworld.core.decision.proposal.InvestigateProposer;
 import dev.evoworld.core.decision.proposal.RestProposer;
 import dev.evoworld.core.decision.proposal.SleepProposer;
+import dev.evoworld.core.decision.proposal.StockUpProposer;
 import dev.evoworld.core.goal.Motivation;
 import dev.evoworld.core.perception.Perception;
 import dev.evoworld.core.random.SimulationRandom;
@@ -80,6 +83,12 @@ public final class DeliberativeDecisionMaker implements DecisionMaker {
                         new HeadForPlentyProposer(
                                 actions.moveEnergyCost(), steps, actions.gatherTicks(tick)),
                         new InvestigateProposer(actions.eatPortion(), actions.moveEnergyCost(), steps),
+                        new CraftProposer(tick),
+                        new FetchMaterialsProposer(
+                                actions.gatherAmount(), actions.gatherEnergyCost(),
+                                actions.gatherTicks(tick), actions.moveEnergyCost(), steps),
+                        new StockUpProposer(
+                                actions.gatherAmount(), actions.gatherEnergyCost(), actions.gatherTicks(tick)),
                         new DiscardProposer(actions.gatherAmount()),
                         new RestProposer(body),
                         new SleepProposer(body, nightTicks),

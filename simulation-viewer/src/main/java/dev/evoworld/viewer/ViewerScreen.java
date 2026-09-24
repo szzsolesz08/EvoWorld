@@ -403,8 +403,8 @@ final class ViewerScreen extends ApplicationAdapter {
     private static List<String[]> rows(AgentStatus status, Simulation simulation) {
         List<String> lines = StatusReport.lines(status, simulation.config().tickDuration());
         List<String> wanted = List.of(
-                "wants", "doing", "last act", "intent", "carrying", "knows", "skills", "plenty",
-                "explored");
+                "wants", "doing", "last act", "intent", "carrying", "kit", "knows", "skills",
+                "plenty", "explored");
         return lines.stream()
                 .skip(1)
                 .filter(line -> line.length() > 14)

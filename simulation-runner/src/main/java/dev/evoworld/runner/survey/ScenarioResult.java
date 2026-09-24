@@ -130,6 +130,18 @@ public record ScenarioResult(Scenario scenario, long ticks, List<SeedResult> see
                 : seeds.stream().mapToInt(SeedResult::chunksEntered).average().orElse(0.0);
     }
 
+    /** Hours a day spent walking to water, averaged over the days lived. */
+    public double waterWalkPerDay() {
+        return perDay(seeds.stream().mapToDouble(SeedResult::waterWalkHours).sum());
+    }
+
+    /** Things made per run, averaged over the seeds. */
+    public double craftsPerRun() {
+        return seeds.isEmpty()
+                ? 0.0
+                : seeds.stream().mapToInt(SeedResult::crafts).average().orElse(0.0);
+    }
+
     private double perDay(double total) {
         double days = seeds.stream().mapToDouble(SeedResult::days).sum();
         return days <= 0.0 ? 0.0 : total / days;

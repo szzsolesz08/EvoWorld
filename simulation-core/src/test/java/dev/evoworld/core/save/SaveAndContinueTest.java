@@ -16,6 +16,9 @@ import dev.evoworld.core.decision.Decision;
 import dev.evoworld.core.decision.DeliberativeDecisionMaker;
 import dev.evoworld.core.event.SimulationEvent;
 import dev.evoworld.core.observer.SimulationObserver;
+import dev.evoworld.core.item.Item;
+import dev.evoworld.core.item.ItemKind;
+import dev.evoworld.core.resource.ResourceType;
 import dev.evoworld.core.world.World;
 import dev.evoworld.core.world.WorldGenerator;
 import java.util.ArrayList;
@@ -333,14 +336,16 @@ class SaveAndContinueTest {
     @Test
     @DisplayName("a run resumed mid-walk goes on into country neither half had seen")
     void resumingCarriesOnIntoNewCountry() {
+        // Long enough that it certainly moves on: an agent with a flask to
+        // fill and wood to find stays put more than it used to.
         Simulation unbroken = fresh(3L);
-        unbroken.run(1200);
+        unbroken.run(2400);
 
         Simulation before = fresh(3L);
-        before.run(600);
+        before.run(1200);
         Simulation resumed = Simulation.load(before.save());
         int chunksAtTheBreak = resumed.world().chunkCount();
-        resumed.run(600);
+        resumed.run(1200);
 
         assertEquals(unbroken.snapshot(), resumed.snapshot());
         assertTrue(
@@ -350,5 +355,54 @@ class SaveAndContinueTest {
                 unbroken.world().chunkCount(),
                 resumed.world().chunkCount(),
                 "and met exactly the country it would have met");
+    }
+
+    @Test
+    @DisplayName("what it has made, and what is in it, comes back from a save")
+    void theKitSurvivesASave() {
+        Simulation before = fresh(1L);
+        before.run(600);
+        Agent had = atlas(before);
+        had.acquire(Item.made(ItemKind.FLASK));
+        had.store(ResourceType.WATER, 5.0);
+        had.use(ItemKind.FLASK);
+
+        Agent back = atlas(Simulation.load(before.save()));
+
+        assertEquals(had.belongings(), back.belongings(), "the same kit, worn the same amount");
+        assertEquals(
+                had.inventory().quantityOf(ResourceType.WATER),
+                back.inventory().quantityOf(ResourceType.WATER),
+                1e-9,
+                "with the same water still in it");
+        assertEquals(had.inventory().capacity(), back.inventory().capacity(), 1e-9,
+                "and the same room left in the pack");
+    }
+
+    @Test
+    @DisplayName("a pack does not shrink a little every time the run is saved and loaded")
+    void theePackKeepsItsSize() {
+        Simulation before = fresh(1L);
+        atlas(before).acquire(Item.made(ItemKind.FLASK));
+        double afterOne = atlas(before).inventory().capacity();
+
+        Simulation reloaded = Simulation.load(Simulation.load(before.save()).save());
+
+        assertEquals(afterOne, atlas(reloaded).inventory().capacity(), 1e-9);
+    }
+
+    @Test
+    @DisplayName("a run with a flask in it resumes exactly, kit and all")
+    void resumingWithAKit() {
+        Simulation unbroken = fresh(1L);
+        unbroken.run(1200);
+
+        Simulation before = fresh(1L);
+        before.run(600);
+        Simulation resumed = Simulation.load(before.save());
+        resumed.run(600);
+
+        assertEquals(unbroken.snapshot(), resumed.snapshot());
+        assertEquals(atlas(unbroken).belongings(), atlas(resumed).belongings());
     }
 }

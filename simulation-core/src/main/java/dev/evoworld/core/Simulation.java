@@ -553,7 +553,7 @@ public final class Simulation {
      */
     private void learnFrom(Agent agent, Action action, ActionOutcome outcome, SimulationTime now) {
         Knowledge before = agent.knowledge();
-        Knowledge after = KnowledgeLearner.learnFrom(before, action, outcome);
+        Knowledge after = KnowledgeLearner.learnFrom(before, action, outcome, agent.belongings());
         agent.updateKnowledge(after);
         for (Belief belief : after.beliefs()) {
             if (belief.observations() == 1

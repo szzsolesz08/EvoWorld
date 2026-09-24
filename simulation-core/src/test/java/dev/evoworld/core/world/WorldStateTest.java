@@ -8,6 +8,7 @@ import dev.evoworld.core.SimulationTime;
 import dev.evoworld.core.agent.Agent;
 import dev.evoworld.core.agent.AgentId;
 import dev.evoworld.core.agent.Inventory;
+import dev.evoworld.core.item.Belongings;
 import dev.evoworld.core.agent.Needs;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -26,7 +27,7 @@ class WorldStateTest {
                 "Atlas",
                 location,
                 Needs.healthy(),
-                Inventory.empty(),
+                Inventory.empty(), Belongings.nothing(),
                 0L,
                 true);
     }

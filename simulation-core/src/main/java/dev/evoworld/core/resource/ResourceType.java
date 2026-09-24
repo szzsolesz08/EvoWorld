@@ -66,6 +66,17 @@ public enum ResourceType {
         return Rates.perTick(regenPerHour, tick);
     }
 
+    /**
+     * Whether an agent needs something to carry this in.
+     *
+     * <p>True of anything that will not stay in your hands. Berries go in a
+     * pocket; water does not, which is why taking water away from a spring
+     * needs a skin and why, before there were skins, thirst meant a walk.
+     */
+    public boolean needsContainer() {
+        return this == WATER;
+    }
+
     /** Whether nodes of this type come back after being harvested. */
     public boolean isRenewable() {
         return regenPerHour > 0.0;

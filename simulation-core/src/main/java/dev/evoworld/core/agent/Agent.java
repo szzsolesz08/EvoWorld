@@ -2,6 +2,9 @@ package dev.evoworld.core.agent;
 
 import dev.evoworld.core.exploration.ExplorationMap;
 import dev.evoworld.core.intent.Intent;
+import dev.evoworld.core.item.Belongings;
+import dev.evoworld.core.item.Item;
+import dev.evoworld.core.item.ItemKind;
 import dev.evoworld.core.knowledge.Knowledge;
 import dev.evoworld.core.memory.MemoryStore;
 import dev.evoworld.core.resource.ResourceType;
@@ -31,6 +34,9 @@ public final class Agent {
     private Location location;
     private Needs needs;
     private Inventory inventory;
+    private Belongings belongings = Belongings.nothing();
+    /** What the pack holds with nothing in the kit; the kit takes its room out of this. */
+    private double packSize;
     private Knowledge knowledge = Knowledge.innocent();
     private Skills skills = Skills.untrained();
     private final MemoryStore memory;
@@ -55,6 +61,7 @@ public final class Agent {
         this.location = Objects.requireNonNull(location, "location");
         this.needs = Objects.requireNonNull(needs, "needs");
         this.inventory = Objects.requireNonNull(inventory, "inventory");
+        this.packSize = inventory.capacity();
         this.memory = Objects.requireNonNull(memory, "memory");
         this.exploration = Objects.requireNonNull(exploration, "exploration");
     }
@@ -77,12 +84,18 @@ public final class Agent {
             Skills skills,
             MemoryStore memory,
             ExplorationMap exploration,
-            Optional<Intent> intent) {
+            Optional<Intent> intent,
+            Belongings belongings) {
         if (ticksAlive < 0) {
             throw new IllegalArgumentException("age must not be negative, was " + ticksAlive);
         }
         Agent agent = new Agent(id, name, location, needs, inventory, memory, exploration);
         agent.ticksAlive = ticksAlive;
+        agent.belongings = Objects.requireNonNull(belongings, "belongings");
+        // The saved pack was already short by what the kit takes up, so the
+        // full size has to be put back before the kit is charged for again -
+        // otherwise every save and load would shrink it a little further.
+        agent.packSize = inventory.capacity() + belongings.bulk();
         agent.knowledge = Objects.requireNonNull(knowledge, "knowledge");
         agent.skills = Objects.requireNonNull(skills, "skills");
         agent.intent = Objects.requireNonNull(intent, "intent");
@@ -123,6 +136,54 @@ public final class Agent {
 
     public Needs needs() {
         return needs;
+    }
+
+    /** What the agent has on it: containers, tools, whatever it has made. */
+    public Belongings belongings() {
+        return belongings;
+    }
+
+    /**
+     * Takes something new into the kit, at the cost of room in the pack.
+     *
+     * <p>Anything that no longer fits is dropped rather than quietly vanishing:
+     * a pack is a pack, and picking up an axe with your hands full means
+     * putting something down.
+     */
+    public void acquire(Item item) {
+        this.belongings = belongings.plus(Objects.requireNonNull(item, "item"));
+        this.inventory = inventory.withCapacity(packCapacity());
+    }
+
+    /**
+     * Wears one of these by a use, and throws it away if that finished it.
+     *
+     * <p>Losing a container can leave the agent carrying more than it has
+     * anything to carry it in, so what will not fit is spilled here.
+     */
+    public void use(ItemKind kind) {
+        Belongings used = belongings.after(kind);
+        this.belongings = used.withoutWornOut();
+        this.inventory = inventory.withCapacity(packCapacity());
+        spillWhatCannotBeCarried();
+    }
+
+    /** What is left of the pack once the kit has taken its room. */
+    private double packCapacity() {
+        return Math.max(Inventory.MINIMUM_CAPACITY, packSize - belongings.bulk());
+    }
+
+    /** Pours away anything the agent no longer has a container for. */
+    private void spillWhatCannotBeCarried() {
+        for (ResourceType type : ResourceType.values()) {
+            if (!type.needsContainer()) {
+                continue;
+            }
+            double spare = inventory.quantityOf(type) - belongings.roomFor(type);
+            if (spare > 0.0) {
+                inventory = inventory.minus(type, spare);
+            }
+        }
     }
 
     public Inventory inventory() {
@@ -221,10 +282,21 @@ public final class Agent {
      *     agent is already loaded
      */
     public double store(ResourceType type, double amount) {
-        Inventory updated = inventory.plus(type, amount);
+        Inventory updated = inventory.plus(type, Math.min(amount, roomFor(type)));
         double stored = updated.total() - inventory.total();
         this.inventory = updated;
         return stored;
+    }
+
+    /**
+     * How much more of something the agent could take.
+     *
+     * <p>Some things cannot be held in your hands: without a container there is
+     * no room for water however empty the pack is, which is what makes a
+     * waterskin worth having rather than a decoration.
+     */
+    public double roomFor(ResourceType type) {
+        return snapshot().roomFor(type);
     }
 
     /**
@@ -272,7 +344,7 @@ public final class Agent {
     /** An immutable copy of everything observable about this agent right now. */
     public AgentSnapshot snapshot() {
         return new AgentSnapshot(
-                id, name, location, needs, inventory, ticksAlive, isAlive(), intent);
+                id, name, location, needs, inventory, belongings, ticksAlive, isAlive(), intent);
     }
 
     @Override

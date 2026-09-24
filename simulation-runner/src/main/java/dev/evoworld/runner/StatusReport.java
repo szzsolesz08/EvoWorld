@@ -39,7 +39,8 @@ import org.slf4j.LoggerFactory;
  *    status     alive, age 3d 14h, health 100.0
  *    location   (5,12)
  *    needs      hunger 12.0, thirst 30.0, energy 82.0
- *    carrying   berries 5.0
+ *    carrying   berries 5.0, water 4.0 (9 of 18)
+ *    kit        flask 84%
  *    wants      satisfy thirst (0.09)
  *    last act   MOVE to (2,8), for satisfy thirst (water 3 steps north)
  *    intent     heading for (2,8) to satisfy thirst, 3 steps to go, set out 4 ticks ago
@@ -116,9 +117,17 @@ public final class StatusReport implements SimulationObserver {
                 needs.hunger(),
                 needs.thirst(),
                 needs.energy()));
-        row(lines, "carrying", body.inventory().isEmpty()
-                ? "nothing"
-                : body.inventory().toString().replaceFirst("^carrying ", ""));
+        row(lines, "carrying", String.format(
+                Locale.ROOT,
+                "%s (%.0f of %.0f)",
+                body.inventory().isEmpty()
+                        ? "nothing"
+                        : body.inventory().toString().replaceFirst("^carrying ", ""),
+                body.inventory().total(),
+                body.inventory().capacity()));
+        if (!body.belongings().isEmpty()) {
+            row(lines, "kit", body.belongings().describe());
+        }
         if (body.alive()) {
             row(lines, "wants", status.wants().map(StatusReport::describe).orElse("(not decided yet)"));
             // "Doing" only while a job is actually under way. Otherwise the
@@ -231,6 +240,9 @@ public final class StatusReport implements SimulationObserver {
                         ? String.format(Locale.ROOT, "drink, %.1f a unit (%.0f%%)",
                                 belief.estimate(), belief.confidence() * 100)
                         : "not a drink";
+                case USEFULNESS -> belief.estimate() > 0.0
+                        ? String.format(Locale.ROOT, "worth having (%.0f%%)", belief.confidence() * 100)
+                        : "no use";
                 case LOCATION_RELIABILITY -> null;
             };
             if (fact != null) {

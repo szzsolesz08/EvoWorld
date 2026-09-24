@@ -35,7 +35,7 @@ public record SavedSimulation(
         List<SavedAgent> agents) {
 
     /** The shape of save this version of EvoWorld writes and reads. */
-    public static final int FORMAT_VERSION = 5;
+    public static final int FORMAT_VERSION = 6;
 
     public SavedSimulation {
         Objects.requireNonNull(config, "config");

@@ -46,18 +46,21 @@ public final class SurveyReport {
         lines.add("");
         lines.add(
                 "| Scenario | Sleep h/day | Sleeps/day | Meals/day | Drinks/day "
-                        + "| Free time | Chunks entered |");
-        lines.add("| --- | ---: | ---: | ---: | ---: | ---: | ---: |");
+                        + "| Free time | Chunks entered | Water walk h/day | Made |");
+        lines.add("| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |");
         for (ScenarioResult result : results) {
             lines.add(String.format(
-                    Locale.ROOT, "| %s | %.1f | %.2f | %.1f | %.1f | %.0f%% | %.1f |",
+                    Locale.ROOT,
+                    "| %s | %.1f | %.2f | %.1f | %.1f | %.0f%% | %.1f | %.2f | %.1f |",
                     result.scenario().name(),
                     result.sleepHoursPerDay(),
                     result.sleepsPerDay(),
                     result.mealsPerDay(),
                     result.drinksPerDay(),
                     result.freeShare() * 100,
-                    result.chunksPerRun()));
+                    result.chunksPerRun(),
+                    result.waterWalkPerDay(),
+                    result.craftsPerRun()));
         }
 
         lines.add("");

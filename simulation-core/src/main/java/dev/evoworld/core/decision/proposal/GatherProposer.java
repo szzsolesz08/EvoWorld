@@ -44,7 +44,7 @@ public final class GatherProposer implements ActionProposer {
     public List<ActionCandidate> propose(Perception perception, SimulationRandom random) {
         Optional<PerceivedResource> here =
                 perception.underfoot().filter(PerceivedResource::isAvailable);
-        if (here.isEmpty() || perception.inventory().isFull()) {
+        if (here.isEmpty() || perception.roomFor(here.get().type()) <= 0.0) {
             return List.of();
         }
 
@@ -62,7 +62,7 @@ public final class GatherProposer implements ActionProposer {
         // DiscardProposer's problem.
         double haul = Math.max(SAMPLE, amount * sureness);
         double wouldGet = Math.min(
-                Math.min(haul, node.quantity()), perception.inventory().spaceFor(haul));
+                Math.min(haul, node.quantity()), perception.roomFor(node.type()));
         if (wouldGet <= 0.0) {
             return List.of();
         }

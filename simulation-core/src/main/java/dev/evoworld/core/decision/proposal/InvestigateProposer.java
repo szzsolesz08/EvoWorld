@@ -80,6 +80,20 @@ public final class InvestigateProposer implements ActionProposer {
                         knowledge.confidence(BeliefKind.HYDRATION, here.type()),
                         "never tried drinking " + here.type().label()));
             }
+            // A taste of what is underfoot, for the things that cannot be
+            // picked up and tried later. Without it an agent could never find
+            // out that water is not food, and kept going back to a spring
+            // hoping for a meal. Only for those things: anything it can carry
+            // is better sampled the ordinary way, out of its own pack, and
+            // offering both had it nibbling at the ground instead of eating.
+            if (canReadHunger
+                    && perception.roomFor(here.type()) <= 0.0
+                    && !knowledge.hasTested(BeliefKind.NOURISHMENT, here.type())) {
+                candidates.add(experiment(
+                        EatAction.fromGround(here.type(), Math.min(sample, here.quantity())),
+                        knowledge.confidence(BeliefKind.NOURISHMENT, here.type()),
+                        "never tried eating " + here.type().label()));
+            }
         });
 
         for (ResourceType type : ResourceType.values()) {

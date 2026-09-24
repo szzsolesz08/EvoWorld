@@ -8,6 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import dev.evoworld.core.SimulationTime;
 import dev.evoworld.core.agent.AgentId;
 import dev.evoworld.core.agent.Inventory;
+import dev.evoworld.core.item.Belongings;
 import dev.evoworld.core.agent.Needs;
 import dev.evoworld.core.knowledge.Knowledge;
 import dev.evoworld.core.perception.ExplorationView;
@@ -38,7 +39,7 @@ class MotivationSystemTest {
                 "Atlas",
                 new Location(8, 8),
                 needs,
-                Inventory.empty(),
+                Inventory.empty(), Belongings.nothing(),
                 0L,
                 needs.isAlive());
         return new Perception(
@@ -246,12 +247,12 @@ class MotivationSystemTest {
         }
 
         @Test
-        @DisplayName("all five wants are weighed every time, not just the winner")
+        @DisplayName("every want is weighed every time, not just the winner")
         void everyGoalIsWeighed() {
             Motivation motivation = assess(new Needs(40, 40, 40, 60));
 
-            assertEquals(5, motivation.goals().size());
-            assertEquals(5, motivation.wanted().size());
+            assertEquals(6, motivation.goals().size());
+            assertEquals(6, motivation.wanted().size());
             assertTrue(motivation.goals().contains(motivation.dominant()));
         }
 
@@ -260,8 +261,9 @@ class MotivationSystemTest {
         void unwantedGoalsAreStillReported() {
             Motivation motivation = assess(Needs.healthy());
 
-            assertEquals(5, motivation.goals().size());
-            assertEquals(1, motivation.wanted().size(), "only exploring is actually wanted");
+            assertEquals(6, motivation.goals().size());
+            assertEquals(2, motivation.wanted().size(),
+                    "a healthy agent wants to look around, and to have water with it");
             assertFalse(motivation.forGoal(SatisfyHungerGoal.NAME).orElseThrow().isWanted());
         }
 

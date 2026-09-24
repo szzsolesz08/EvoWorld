@@ -26,6 +26,9 @@ public record Inventory(Map<ResourceType, Double> contents, double capacity) {
 
     public static final double DEFAULT_CAPACITY = 20.0;
 
+    /** However full the kit, there is always room for a handful of something. */
+    public static final double MINIMUM_CAPACITY = 1.0;
+
     public Inventory {
         if (capacity <= 0.0) {
             throw new IllegalArgumentException("capacity must be positive, was " + capacity);
@@ -58,6 +61,29 @@ public record Inventory(Map<ResourceType, Double> contents, double capacity) {
 
     public static Inventory empty(double capacity) {
         return new Inventory(Map.of(), capacity);
+    }
+
+    /**
+     * The same contents in a pack of a different size.
+     *
+     * <p>Room comes and goes as the agent picks up and wears out its kit.
+     * Anything that no longer fits is dropped: the alternative is an inventory
+     * that quietly holds more than it can, and then the arithmetic is a lie.
+     */
+    public Inventory withCapacity(double newCapacity) {
+        if (newCapacity == capacity) {
+            return this;
+        }
+        Map<ResourceType, Double> kept = new EnumMap<>(ResourceType.class);
+        double room = newCapacity;
+        for (Map.Entry<ResourceType, Double> entry : contents.entrySet()) {
+            double fits = Math.min(entry.getValue(), Math.max(0.0, room));
+            if (fits > 0.0) {
+                kept.put(entry.getKey(), fits);
+                room -= fits;
+            }
+        }
+        return new Inventory(kept, newCapacity);
     }
 
     public double quantityOf(ResourceType type) {

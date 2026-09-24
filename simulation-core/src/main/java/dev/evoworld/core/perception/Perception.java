@@ -4,6 +4,7 @@ import dev.evoworld.core.SimulationTime;
 import dev.evoworld.core.agent.AgentId;
 import dev.evoworld.core.agent.Inventory;
 import dev.evoworld.core.agent.Needs;
+import dev.evoworld.core.item.Belongings;
 import dev.evoworld.core.knowledge.Knowledge;
 import dev.evoworld.core.resource.ResourceType;
 import dev.evoworld.core.world.AgentSnapshot;
@@ -80,6 +81,16 @@ public record Perception(
 
     public Inventory inventory() {
         return self.inventory();
+    }
+
+    /** How much more of something the agent could carry, pack and containers together. */
+    public double roomFor(dev.evoworld.core.resource.ResourceType type) {
+        return self.roomFor(type);
+    }
+
+    /** What the agent has on it: its containers and tools, always known in full. */
+    public Belongings belongings() {
+        return self.belongings();
     }
 
     public long tick() {

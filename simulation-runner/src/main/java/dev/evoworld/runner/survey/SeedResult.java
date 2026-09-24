@@ -36,6 +36,8 @@ import java.util.TreeMap;
  * @param upkeepHours simulated hours spent looking after itself: sleeping,
  *     resting, eating, drinking, and gathering or walking for food and water
  * @param chunksEntered how many chunks of the world the run set foot in
+ * @param waterWalkHours simulated hours spent walking for water
+ * @param crafts things it made
  */
 public record SeedResult(
         long seed,
@@ -62,7 +64,9 @@ public record SeedResult(
         int meals,
         int drinks,
         double upkeepHours,
-        int chunksEntered) {
+        int chunksEntered,
+        double waterWalkHours,
+        int crafts) {
 
     public SeedResult {
         Objects.requireNonNull(death, "death");

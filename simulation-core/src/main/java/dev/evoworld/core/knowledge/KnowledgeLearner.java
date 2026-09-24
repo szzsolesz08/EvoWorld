@@ -6,6 +6,8 @@ import dev.evoworld.core.action.DrinkAction;
 import dev.evoworld.core.action.EatAction;
 import dev.evoworld.core.action.GatherAction;
 import dev.evoworld.core.agent.Needs;
+import dev.evoworld.core.item.Belongings;
+import dev.evoworld.core.item.ItemKind;
 import dev.evoworld.core.resource.ResourceType;
 import java.util.Optional;
 
@@ -39,6 +41,9 @@ public final class KnowledgeLearner {
     /** What the agent concludes a thing is worth when told it is not food at all. */
     private static final double WORTHLESS = 0.0;
 
+    /** What one piece of evidence says about a thing that just did its job. */
+    private static final double WORTH_IT = 1.0;
+
     private KnowledgeLearner() {
     }
 
@@ -49,6 +54,49 @@ public final class KnowledgeLearner {
      *     learn - most outcomes teach nothing, and that is fine
      */
     public static Knowledge learnFrom(Knowledge knowledge, Action action, ActionOutcome outcome) {
+        return learnFrom(knowledge, action, outcome, Belongings.nothing());
+    }
+
+    /**
+     * The same, for an agent with a kit: a thing that did its job is a thing
+     * worth having, and that is how an agent finds out what its flask is for.
+     *
+     * @param kit what the agent had on it when the action came off
+     */
+    public static Knowledge learnFrom(
+            Knowledge knowledge, Action action, ActionOutcome outcome, Belongings kit) {
+        Knowledge learned = learnAboutTheWorld(knowledge, action, outcome);
+        return outcome.succeeded()
+                ? learnAboutTheKit(learned, action, kit)
+                : learned;
+    }
+
+    /**
+     * What an action proves about the thing that made it possible.
+     *
+     * <p>Nothing here says a flask is good. It says that a drink came out of
+     * the pack, which could not have happened without something to keep water
+     * in, and that a haul came in cheaper than bare hands would have managed.
+     * The belief is about the kind of item, so one flask teaches the agent
+     * about flasks.
+     */
+    private static Knowledge learnAboutTheKit(Knowledge knowledge, Action action, Belongings kit) {
+        if (action instanceof DrinkAction drink && drink.isFromPack()) {
+            return ItemKind.carrying(drink.source())
+                    .map(kind -> knowledge.learned(BeliefKind.USEFULNESS, kind.name(), WORTH_IT))
+                    .orElse(knowledge);
+        }
+        if (action instanceof GatherAction gather) {
+            return kit.toolFor(gather.target())
+                    .map(tool -> knowledge.learned(
+                            BeliefKind.USEFULNESS, tool.kind().name(), WORTH_IT))
+                    .orElse(knowledge);
+        }
+        return knowledge;
+    }
+
+    private static Knowledge learnAboutTheWorld(
+            Knowledge knowledge, Action action, ActionOutcome outcome) {
         Optional<ResourceType> subject = action.concerns();
         if (subject.isEmpty()) {
             return knowledge;

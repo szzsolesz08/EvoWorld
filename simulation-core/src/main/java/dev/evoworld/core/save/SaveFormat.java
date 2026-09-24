@@ -22,6 +22,8 @@ import dev.evoworld.core.event.SimulationEvent.Danger;
 import dev.evoworld.core.exploration.ExplorationMap;
 import dev.evoworld.core.exploration.Region;
 import dev.evoworld.core.intent.Intent;
+import dev.evoworld.core.item.Belongings;
+import dev.evoworld.core.item.Item;
 import dev.evoworld.core.knowledge.Belief;
 import dev.evoworld.core.knowledge.Knowledge;
 import dev.evoworld.core.memory.Memory;
@@ -233,6 +235,9 @@ public final class SaveFormat {
                 agent.inventory().contents().entrySet().stream()
                         .map(entry -> new SavedAmount(entry.getKey(), entry.getValue()))
                         .toList(),
+                agent.belongings().items().stream()
+                        .map(item -> new SavedItem(item.kind(), item.usesLeft()))
+                        .toList(),
                 agent.knowledge().beliefs().stream()
                         .map(belief -> new SavedBelief(
                                 belief.kind(),
@@ -326,7 +331,10 @@ public final class SaveFormat {
                                 intent.goalName(),
                                 new Location(intent.x(), intent.y()),
                                 intent.formedAtTick(),
-                                intent.startingDistance())));
+                                intent.startingDistance())),
+                new Belongings(saved.belongings().stream()
+                        .map(item -> new Item(item.kind(), item.usesLeft()))
+                        .toList()));
     }
 
     // --- memories ---------------------------------------------------------

@@ -61,9 +61,9 @@ and the full pipeline from perception to learning, running unattended and reprod
 | World | an endless seeded world in 64×64 chunks, built as it is walked into and stable ever after; country that varies from berry field to bare slope; berries, water, wood and stone that regrow at their own rates (stone never does). A walled world of any size is still available |
 | Time | discrete ticks of configurable simulated length (default 10 minutes); days and hours in all output |
 | Body | hunger, thirst, energy and health at realistic hourly rates; energy spent awake and restored asleep; unmet needs that do damage; healing when looked after, fastest asleep |
-| Actions | move, gather, eat, drink, rest, sleep, discard; explicit preconditions, structured outcomes, multi-tick work |
+| Actions | move, gather, eat, drink, rest, sleep, craft, discard; explicit preconditions, structured outcomes, multi-tick work |
 | Perception | a twelve-step field of view, about two hours' walk; nothing beyond it is known except by memory |
-| Goals | four wants (thirst, hunger, energy, curiosity) scored from the body, never from a rule |
+| Goals | six wants (thirst, hunger, energy, health, curiosity, provisioning) scored from the agent's state, never from a rule |
 | Decisions | propose, evaluate, select: six-factor utility, no if/else behaviour anywhere |
 | Memory | six kinds of memory with decaying confidence, bounded, recalled by relevance |
 | Knowledge | general beliefs learned from outcomes, distinct from memory; the agent starts ignorant |
@@ -172,6 +172,7 @@ Five goals each score themselves from the agent's state. A goal says **what**, n
 | recover energy | `(1 − energy / 100)²` |
 | recover health | `(1 − health / 100)²` |
 | explore | `0.6 × energy × unexplored fraction × (1 − most pressing need²)` |
+| stay provisioned | `0.3 × (1 − water carried / a day's worth) × (1 − most pressing need²)` |
 
 Hunger and thirst are an **appetite** and an **urgency** at once. The appetite comes
 early and levels off: a few hours after a meal he is peckish and eats if food is at hand.
@@ -182,6 +183,34 @@ Curiosity is what is left once survival has had its say, so a comfortable agent 
 and a dying one does not. Injury does *not* quiet curiosity. Exploring is how a newborn
 finds food, and when injury was counted against curiosity, three wounded newborns in
 twenty starved.
+
+### Carrying, containers and making things
+
+Water used to be something you could only drink where you found it, and the survey put
+about two hours of every day into walking back to a spring. A flask changes that, and
+nothing about the decision layer had to change to let it:
+
+- **A container is not a place water goes; it is the reason water can be carried at all.**
+  Water needs something to carry it in, so an agent with no flask has no room for water
+  however empty its pack. With one, drinking from the pack is the exact mirror of eating
+  from it, and the evaluator weighs a sip in hand against a walk to a spring on the usual
+  terms.
+- **One new want: stay provisioned.** Every other goal answers a need the body feels now,
+  which is why none of them would ever fill a flask - water in a skin relieves no thirst
+  while you are standing in a spring. This one says "I would rather have a day's water on
+  me than not", and knows nothing of flasks or springs. It goes quiet when anything is
+  actually the matter, exactly as curiosity does.
+- **Recipes are known; what a thing is worth is not.** A flask is six wood; an axe is wood
+  and stone. Whether any of it is worth the trouble is a belief that starts as a hunch and
+  is settled by owning one - a drink out of the pack is evidence that a flask was a good
+  idea, learned by the same machinery that learns what berries are worth.
+- **Tools compound with skill.** A gather costs `energy × skill × tool` and yields
+  `amount × tool`, and using a tool wears it out.
+
+Left alone, Atlas picks up wood he walks past, makes a flask, fills it whenever he is at
+water, drinks from it a day's walk away, and comes to believe - at about 90% confidence -
+that flasks are worth having. Water travel falls by about 57% in the default world, and
+free time rises from 47% to 51%.
 
 ### A body in real time
 
@@ -566,8 +595,10 @@ Honest ones, most important first.
 - **A simple world.** Endless, but flat: four resource types, no terrain, weather, day and
   night, or line of sight. The field of view is a diamond measured in steps. Chunks vary
   only in how much they hold, not in what kind of place they are.
-- **Wood and stone have no use.** They are only ever gathered as experiments, and put
-  down once the agent learns they are not food.
+- **Stone has no use in practice.** An axe and a pick exist, work, and are learned about,
+  but the arithmetic says they are not worth the materials in a world where gathering is
+  occasional and energy comes back with sleep - so Atlas never makes one. Wood is used:
+  it is what a flask is made of.
 - **One agent.** Perception of other agents exists and is tested, but nothing reacts to
   them.
 - **Hand-picked balance.** The constants (need rates, curiosity, confidence priors) were

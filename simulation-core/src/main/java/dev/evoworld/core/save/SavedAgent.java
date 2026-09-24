@@ -9,6 +9,7 @@ import java.util.Objects;
  * One agent: its body, its mind, and what it was in the middle of.
  *
  * @param inventory what it carries, in declaration order
+ * @param belongings the kit it has on it, in the order it came by each piece
  * @param beliefs what it has worked out, in the order it worked it out
  * @param memories what it remembers, oldest first - the order decides what is
  *     forgotten first, so it is part of the state
@@ -36,6 +37,7 @@ public record SavedAgent(
         long ticksAlive,
         double inventoryCapacity,
         List<SavedAmount> inventory,
+        List<SavedItem> belongings,
         List<SavedBelief> beliefs,
         List<SavedSkill> skills,
         int memoryCapacity,
@@ -54,6 +56,7 @@ public record SavedAgent(
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(lastActivity, "lastActivity");
         inventory = List.copyOf(inventory);
+        belongings = List.copyOf(belongings);
         beliefs = List.copyOf(beliefs);
         skills = List.copyOf(skills);
         memories = List.copyOf(memories);

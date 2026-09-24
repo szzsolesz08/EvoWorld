@@ -10,11 +10,14 @@ import java.util.Objects;
 import java.util.Optional;
 
 /**
- * Drink from a source the agent is standing on.
+ * Drink, either from a source underfoot or from what the agent carries.
  *
- * <p>The mirror of {@link EatAction}: food is carried, water is somewhere you
- * have to be. That asymmetry is deliberate - you can take berries with you, and
- * you cannot take a spring.
+ * <p>It used to be only the first: food was carried and water was somewhere you
+ * had to be. That asymmetry was in the world, not in the body - you cannot take
+ * a spring with you, but you can take a skin of water - so it belongs to
+ * whether the agent has anything to carry water in, not to what drinking is.
+ * Given a container, drinking from the pack is the exact mirror of eating from
+ * it, and the decision layer needs no new idea to weigh one against the other.
  *
  * <p>Names the source it means to drink from rather than taking whatever is
  * underfoot, so an outcome says what it was about without anyone having to
@@ -27,13 +30,29 @@ public final class DrinkAction extends Action {
 
     private final ResourceType source;
     private final double gulp;
+    private final boolean fromPack;
 
     public DrinkAction(ResourceType source, double gulp) {
+        this(source, gulp, false);
+    }
+
+    /** A drink from what the agent is carrying rather than from the ground. */
+    public static DrinkAction fromPack(ResourceType source, double gulp) {
+        return new DrinkAction(source, gulp, true);
+    }
+
+    public DrinkAction(ResourceType source, double gulp, boolean fromPack) {
         this.source = Objects.requireNonNull(source, "source");
         if (gulp <= 0.0) {
             throw new IllegalArgumentException("must drink something, was " + gulp);
         }
         this.gulp = gulp;
+        this.fromPack = fromPack;
+    }
+
+    /** Whether this drinks what is carried rather than what is underfoot. */
+    public boolean isFromPack() {
+        return fromPack;
     }
 
     public ResourceType source() {
@@ -56,10 +75,16 @@ public final class DrinkAction extends Action {
 
     @Override
     protected Optional<Refusal> precondition(Agent agent, World world) {
-        Optional<ResourceNode> here = world.availableResourceAt(agent.location());
-        if (here.isEmpty() || here.get().type() != source) {
-            return Optional.of(
-                    Refusal.now("no " + source.label() + " to drink at " + agent.location()));
+        if (fromPack) {
+            if (agent.inventory().quantityOf(source) <= 0.0) {
+                return Optional.of(Refusal.now("no " + source.label() + " left to drink"));
+            }
+        } else {
+            Optional<ResourceNode> here = world.availableResourceAt(agent.location());
+            if (here.isEmpty() || here.get().type() != source) {
+                return Optional.of(
+                        Refusal.now("no " + source.label() + " to drink at " + agent.location()));
+            }
         }
         // What a thing is comes before how the agent happens to feel: stone is
         // not a drink whether or not anyone is thirsty, and saying so first is
@@ -75,16 +100,17 @@ public final class DrinkAction extends Action {
 
     @Override
     protected String effect(Agent agent, World world) {
-        ResourceNode node = world.availableResourceAt(agent.location()).orElseThrow();
-        double drunk = node.harvest(gulp);
+        double drunk = fromPack
+                ? agent.take(source, gulp)
+                : world.availableResourceAt(agent.location()).orElseThrow().harvest(gulp);
         double before = agent.needs().thirst();
         agent.drink(drunk * source.hydrationPerUnit());
         return String.format(
                 Locale.ROOT,
-                "drank %.1f %s at %s, thirst %.1f -> %.1f",
+                "drank %.1f %s %s, thirst %.1f -> %.1f",
                 drunk,
                 source.label(),
-                agent.location(),
+                fromPack ? "from its pack" : "at " + agent.location(),
                 before,
                 agent.needs().thirst());
     }
@@ -93,16 +119,17 @@ public final class DrinkAction extends Action {
     public boolean equals(Object other) {
         return other instanceof DrinkAction drink
                 && source == drink.source
+                && fromPack == drink.fromPack
                 && Double.compare(gulp, drink.gulp) == 0;
     }
 
     @Override
     public int hashCode() {
-        return Objects.hash(source, gulp);
+        return Objects.hash(source, gulp, fromPack);
     }
 
     @Override
     public String toString() {
-        return NAME + " " + source.label();
+        return NAME + " " + source.label() + (fromPack ? " (carried)" : "");
     }
 }

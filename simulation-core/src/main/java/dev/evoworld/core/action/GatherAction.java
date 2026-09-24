@@ -1,6 +1,8 @@
 package dev.evoworld.core.action;
 
 import dev.evoworld.core.agent.Agent;
+import dev.evoworld.core.item.Item;
+import dev.evoworld.core.item.ItemKind;
 import dev.evoworld.core.resource.ResourceNode;
 import dev.evoworld.core.resource.ResourceType;
 import dev.evoworld.core.world.World;
@@ -92,8 +94,13 @@ public final class GatherAction extends Action {
             return Optional.of(
                     Refusal.now("no " + target.label() + " left to gather at " + agent.location()));
         }
-        if (agent.inventory().isFull()) {
-            return Optional.of(Refusal.now("already carrying all it can"));
+        if (agent.roomFor(target) <= 0.0) {
+            // Not always the pack being full: water needs something to carry it
+            // in, and an agent without a skin has no room for it at all.
+            return Optional.of(Refusal.now(
+                    target.needsContainer() && agent.belongings().roomFor(target) <= 0.0
+                            ? "nothing to carry " + target.label() + " in"
+                            : "already carrying all it can"));
         }
         if (agent.needs().energy() < energyCost) {
             return Optional.of(Refusal.now("too tired to gather"));
@@ -104,13 +111,25 @@ public final class GatherAction extends Action {
     @Override
     protected String effect(Agent agent, World world) {
         ResourceNode node = world.availableResourceAt(agent.location()).orElseThrow();
+        // The right tool takes more per swing for less effort. Nothing here
+        // knows what an axe is: it asks what it has for this job and uses it.
+        Optional<Item> tool = agent.belongings().toolFor(node.type());
+        double withTool = amount * tool.map(held -> held.kind().yieldMultiplier()).orElse(1.0);
         // Never pull more out of the world than the agent can actually hold:
         // anything harvested past that would simply vanish.
-        double room = agent.inventory().spaceFor(amount);
+        double room = Math.min(withTool, agent.roomFor(node.type()));
         double harvested = node.harvest(room);
         double stored = agent.store(node.type(), harvested);
-        // A practised forager spends less on the same haul.
-        agent.exert(energyCost * agent.skills().effortMultiplier(NAME));
+        // A practised forager spends less on the same haul, and so does one
+        // with an axe; the two compound, because they are different savings.
+        agent.exert(energyCost
+                * agent.skills().effortMultiplier(NAME)
+                * tool.map(held -> held.kind().effortMultiplier()).orElse(1.0));
+        tool.ifPresent(held -> agent.use(held.kind()));
+        // Filling a container wears the container.
+        if (stored > 0.0 && node.type().needsContainer()) {
+            ItemKind.carrying(node.type()).ifPresent(agent::use);
+        }
         return String.format(
                 Locale.ROOT,
                 "gathered %.1f %s at %s, %.1f left in the node",

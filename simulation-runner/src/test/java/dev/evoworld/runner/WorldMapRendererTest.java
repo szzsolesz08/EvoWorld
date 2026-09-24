@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import dev.evoworld.core.SimulationTime;
 import dev.evoworld.core.agent.AgentId;
 import dev.evoworld.core.agent.Inventory;
+import dev.evoworld.core.item.Belongings;
 import dev.evoworld.core.agent.Needs;
 import dev.evoworld.core.resource.ResourceSnapshot;
 import dev.evoworld.core.resource.ResourceType;
@@ -77,7 +78,7 @@ class WorldMapRendererTest {
                         "Atlas",
                         new Location(2, 2),
                         Needs.healthy(),
-                        Inventory.empty(),
+                        Inventory.empty(), Belongings.nothing(),
                         10L,
                         true)),
                 List.of(node(ResourceType.BERRIES, 2, 2, 12.0)));
@@ -98,7 +99,7 @@ class WorldMapRendererTest {
                         "Atlas",
                         new Location(1, 1),
                         Needs.healthy().harm(Needs.MAX),
-                        Inventory.empty(),
+                        Inventory.empty(), Belongings.nothing(),
                         99L,
                         false)),
                 List.of());
