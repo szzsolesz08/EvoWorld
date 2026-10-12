@@ -32,15 +32,17 @@ public record SavedSimulation(
         boolean announced,
         List<SavedResource> resources,
         List<SavedChunk> chunks,
+        List<SavedFire> fires,
         List<SavedAgent> agents) {
 
     /** The shape of save this version of EvoWorld writes and reads. */
-    public static final int FORMAT_VERSION = 6;
+    public static final int FORMAT_VERSION = 7;
 
     public SavedSimulation {
         Objects.requireNonNull(config, "config");
         resources = List.copyOf(resources);
         chunks = List.copyOf(chunks);
+        fires = List.copyOf(fires);
         agents = List.copyOf(agents);
     }
 }

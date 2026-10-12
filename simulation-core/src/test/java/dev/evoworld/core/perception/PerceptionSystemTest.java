@@ -24,7 +24,10 @@ import org.junit.jupiter.api.Test;
 
 class PerceptionSystemTest {
 
-    private static final SimulationTime NOW = new SimulationTime(1L, Duration.ofMinutes(10));
+    // Midday: how far an agent sees depends on the hour, and these are about
+    // what it can see from where it stands, not about the dark.
+    private static final SimulationTime NOW =
+            new SimulationTime(1L, Duration.ofHours(12).plusMinutes(10));
     private static final Location MIDDLE = new Location(10, 10);
     private static final int RADIUS = 5;
 

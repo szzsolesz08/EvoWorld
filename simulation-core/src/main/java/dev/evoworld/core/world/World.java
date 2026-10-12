@@ -45,6 +45,14 @@ public final class World {
     /** How far around an agent a snapshot reaches: its own chunk, and any it can see into. */
     private static final int SNAPSHOT_REACH = 16;
 
+    /**
+     * The fires burning in the world, in the order they were lit.
+     *
+     * <p>Kept whole rather than by chunk: there are never many, they go out on
+     * their own, and one that has gone out is forgotten the moment it does.
+     */
+    private final Map<Location, Fire> fires = new LinkedHashMap<>();
+
     /** One chunk's worth of ground, and when its regrowth was last brought up to date. */
     private static final class ChunkState {
         private final Map<Location, ResourceNode> nodes = new LinkedHashMap<>();
@@ -214,6 +222,71 @@ public final class World {
         }
     }
 
+    // --- fires -------------------------------------------------------------
+
+    /** Lights a fire here, or feeds the one already burning; returns the wood it took. */
+    public double tendFire(Location where, double wood) {
+        Objects.requireNonNull(where, "where");
+        Fire here = fires.get(where);
+        if (here == null || here.isOut()) {
+            Fire lit = Fire.lit(where, Math.min(wood, Fire.MOST_IT_HOLDS));
+            fires.put(where, lit);
+            return lit.fuel();
+        }
+        return here.feed(wood);
+    }
+
+    /** The fire burning here, if there is one. */
+    public Optional<Fire> fireAt(Location where) {
+        return Optional.ofNullable(fires.get(where)).filter(fire -> !fire.isOut());
+    }
+
+    /**
+     * The fire doing the most to warm a place, if any is.
+     *
+     * <p>What an agent means by "my fire" is the one it can feel, not the one
+     * it is standing exactly on. Judged the other way, an agent one step off
+     * its own fire is warm and believes itself exposed, and spends the night
+     * stepping on and off the same tile.
+     */
+    public Optional<Fire> warmestFireNear(Location where) {
+        Objects.requireNonNull(where, "where");
+        return fires.values().stream()
+                .filter(fire -> fire.warmthAt(where) > 0.0)
+                .max((first, second) -> Double.compare(first.warmthAt(where), second.warmthAt(where)));
+    }
+
+    /** Every fire still burning, in the order they were lit. */
+    public List<Fire> fires() {
+        return fires.values().stream().filter(fire -> !fire.isOut()).toList();
+    }
+
+    /** Puts a saved fire back exactly as it was. */
+    public void restoreFire(Fire fire) {
+        fires.put(Objects.requireNonNull(fire, "fire").location(), fire);
+    }
+
+    /**
+     * How much warmer the fires make a place.
+     *
+     * <p>Fires do not add up: standing between two of them is as warm as the
+     * better of the two, which spares the world a pile of bonfires that warm
+     * an agent more than a summer day.
+     */
+    public double warmthAt(Location where) {
+        double warmest = 0.0;
+        for (Fire fire : fires.values()) {
+            warmest = Math.max(warmest, fire.warmthAt(where));
+        }
+        return warmest;
+    }
+
+    /** Burns every fire for one tick, and forgets the ones that have gone out. */
+    public void burnFires(Duration tick) {
+        fires.values().forEach(fire -> fire.burn(tick, 1L));
+        fires.values().removeIf(Fire::isOut);
+    }
+
     /** One tick of regrowth for every chunk there is; for small fixed maps and tests. */
     public void regenerateResources(Duration tick) {
         chunks.values().forEach(state -> {
@@ -294,6 +367,11 @@ public final class World {
         List<AgentSnapshot> agentSnapshots = agents.stream().map(Agent::snapshot).toList();
         List<ResourceSnapshot> resourceSnapshots =
                 aroundEveryone().stream().map(ResourceNode::snapshot).toList();
-        return new WorldState(time, bounds, agentSnapshots, resourceSnapshots);
+        return new WorldState(
+                time,
+                bounds,
+                agentSnapshots,
+                resourceSnapshots,
+                fires().stream().map(FireSnapshot::of).toList());
     }
 }

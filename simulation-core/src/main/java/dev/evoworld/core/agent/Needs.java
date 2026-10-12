@@ -122,8 +122,9 @@ public record Needs(double hunger, double thirst, double energy, double health) 
      * toll on health, and a body that is well looked after mends a little -
      * most while asleep.
      *
-     * <p>{@code rates} are one tick's worth, and comfort scales only what comes
-     * back: the energy recovered and the healing, never the cost.
+     * <p>{@code rates} are one tick's worth. Comfort scales only what comes
+     * back - the energy recovered and the healing - and chill scales only what
+     * goes out, which is what a body spends holding its temperature.
      *
      * <p>A pure function of the current state, which keeps the rule
      * deterministic and directly testable.
@@ -134,6 +135,10 @@ public record Needs(double hunger, double thirst, double energy, double health) 
         double energyChange = rates.energyChangeFor(exertion.level());
         if (energyChange > 0.0) {
             energyChange *= exertion.comfort();
+        } else {
+            // Shivering is work the body does whether or not the agent meant
+            // to: being cold costs, and being cold and asleep costs too.
+            energyChange *= 1.0 + exertion.chill();
         }
 
         Needs drained = new Needs(nextHunger, nextThirst, energy + energyChange, health);

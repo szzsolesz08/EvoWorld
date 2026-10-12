@@ -296,6 +296,7 @@ class SaveAndContinueTest {
                 current.announced(),
                 current.resources(),
                 current.chunks(),
+                current.fires(),
                 current.agents());
 
         assertThrows(IllegalArgumentException.class, () -> Simulation.load(future));

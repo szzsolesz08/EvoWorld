@@ -4,6 +4,7 @@ import dev.evoworld.core.resource.ResourceSnapshot;
 import dev.evoworld.core.resource.ResourceType;
 import dev.evoworld.core.world.AgentSnapshot;
 import dev.evoworld.core.world.Location;
+import dev.evoworld.core.world.Sky;
 import dev.evoworld.core.world.ViewWindow;
 import dev.evoworld.core.world.WorldState;
 import java.util.ArrayList;
@@ -25,6 +26,7 @@ public final class WorldMapRenderer {
     private static final char EMPTY = '.';
     private static final char DEPLETED = 'x';
     private static final char AGENT = '@';
+    private static final char FIRE = '*';
 
     private WorldMapRenderer() {
     }
@@ -46,9 +48,10 @@ public final class WorldMapRenderer {
     private static String header(WorldState state) {
         return String.format(
                 Locale.ROOT,
-                "world %s at %s - %d resource node(s) in view of %d agent(s), around %s",
+                "world %s at %s, %s - %d resource node(s) in view of %d agent(s), around %s",
                 state.bounds(),
                 state.time(),
+                Sky.at(state.time()),
                 state.resources().size(),
                 state.agents().size(),
                 focus(state));
@@ -90,6 +93,9 @@ public final class WorldMapRenderer {
         if (occupied) {
             return AGENT;
         }
+        if (state.fireAt(location).isPresent()) {
+            return FIRE;
+        }
         return state.resourceAt(location)
                 .map(node -> node.isAvailable() ? symbolFor(node.type()) : DEPLETED)
                 .orElse(EMPTY);
@@ -105,7 +111,7 @@ public final class WorldMapRenderer {
     }
 
     private static String legend() {
-        return "legend: ~ water   b berries   T wood   o stone   x depleted   @ agent   . empty";
+        return "legend: ~ water   b berries   T wood   o stone   * fire   x depleted   @ agent   . empty";
     }
 
     private static List<String> tally(WorldState state) {

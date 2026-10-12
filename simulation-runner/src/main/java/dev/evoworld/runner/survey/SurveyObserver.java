@@ -6,6 +6,7 @@ import dev.evoworld.core.action.EatAction;
 import dev.evoworld.core.action.CraftAction;
 import dev.evoworld.core.action.MoveAction;
 import dev.evoworld.core.action.RestAction;
+import dev.evoworld.core.action.TendFireAction;
 import dev.evoworld.core.action.SleepAction;
 import dev.evoworld.core.agent.AgentId;
 import dev.evoworld.core.agent.Needs;
@@ -86,6 +87,8 @@ public final class SurveyObserver implements SimulationObserver {
     /** Ticks spent walking for water: the cost this milestone set out to cut. */
     private int waterWalkTicks;
     private int crafts;
+    private int firesLit;
+    private int firesFed;
 
     /** Which country it has been in: how much of an endless world one life covers. */
     private final Set<Chunk> chunksEntered = new LinkedHashSet<>();
@@ -147,6 +150,13 @@ public final class SurveyObserver implements SimulationObserver {
         }
         if (outcome.succeeded() && outcome.actionName().equals(CraftAction.NAME)) {
             crafts++;
+        }
+        if (outcome.succeeded() && outcome.actionName().equals(TendFireAction.NAME)) {
+            if (outcome.detail().startsWith("lit")) {
+                firesLit++;
+            } else {
+                firesFed++;
+            }
         }
         if (outcome.succeeded() && outcome.actionName().equals(EatAction.NAME)) {
             if (tick != lastMealTick + 1) {
@@ -307,6 +317,8 @@ public final class SurveyObserver implements SimulationObserver {
                 upkeepTicks * tickHours,
                 chunksEntered.size(),
                 waterWalkTicks * tickHours,
-                crafts);
+                crafts,
+                firesLit,
+                firesFed);
     }
 }

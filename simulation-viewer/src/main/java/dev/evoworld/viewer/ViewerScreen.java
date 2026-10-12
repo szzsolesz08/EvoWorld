@@ -26,6 +26,8 @@ import dev.evoworld.core.status.AgentStatus;
 import dev.evoworld.core.world.AgentSnapshot;
 import dev.evoworld.core.world.Chunk;
 import dev.evoworld.core.world.ViewWindow;
+import dev.evoworld.core.world.Fire;
+import dev.evoworld.core.world.Sky;
 import dev.evoworld.core.world.Location;
 import dev.evoworld.core.world.WorldState;
 import dev.evoworld.persistence.SaveFile;
@@ -61,6 +63,7 @@ final class ViewerScreen extends ApplicationAdapter {
     private static final Color WARN = new Color(0.93f, 0.62f, 0.25f, 1f);
     private static final Color BAD = new Color(0.90f, 0.30f, 0.28f, 1f);
     private static final Color TRACK = new Color(0.22f, 0.24f, 0.27f, 1f);
+    private static final Color FIRE = new Color(0.96f, 0.52f, 0.18f, 1f);
 
     private final Simulation simulation;
     private final int startingSpeed;
@@ -243,7 +246,17 @@ final class ViewerScreen extends ApplicationAdapter {
         atlas.intent().ifPresent(intent -> drawIntent(layout, atlas, intent));
         shapes.end();
 
+        // Fires, drawn under the agent: a ring of warmth and a bright centre.
         shapes.begin(ShapeRenderer.ShapeType.Filled);
+        for (var fire : state.fires()) {
+            shapes.setColor(FIRE.r, FIRE.g, FIRE.b, 0.18f);
+            shapes.circle(layout.centreX(fire.location()), layout.centreY(fire.location()),
+                    layout.tile() * (Fire.RADIUS + 0.5f), 32);
+            shapes.setColor(FIRE);
+            shapes.circle(layout.centreX(fire.location()), layout.centreY(fire.location()),
+                    layout.tile() * 0.32f, 16);
+        }
+
         shapes.setColor(!atlas.alive() ? DIM : isAsleep() ? ASLEEP : ATLAS);
         shapes.circle(layout.centreX(atlas.location()), layout.centreY(atlas.location()),
                 layout.tile() * 0.30f, 24);
@@ -258,6 +271,11 @@ final class ViewerScreen extends ApplicationAdapter {
         AgentStatus status = model.status();
         return status.busyFor() > 0
                 && status.doing().filter(decision -> decision.action().name().equals(SleepAction.NAME)).isPresent();
+    }
+
+    /** How dark the map is drawn: night is dimmer, and dusk shades into it. */
+    private float nightShade(WorldState state) {
+        return 0.45f * (1f - (float) Sky.at(state.time()).daylight());
     }
 
     private void drawIntent(MapLayout layout, AgentSnapshot atlas, Intent intent) {
@@ -403,8 +421,8 @@ final class ViewerScreen extends ApplicationAdapter {
     private static List<String[]> rows(AgentStatus status, Simulation simulation) {
         List<String> lines = StatusReport.lines(status, simulation.config().tickDuration());
         List<String> wanted = List.of(
-                "wants", "doing", "last act", "intent", "carrying", "kit", "knows", "skills",
-                "plenty", "explored");
+                "outside", "wants", "doing", "last act", "intent", "carrying", "kit", "knows",
+                "skills", "plenty", "explored");
         return lines.stream()
                 .skip(1)
                 .filter(line -> line.length() > 14)

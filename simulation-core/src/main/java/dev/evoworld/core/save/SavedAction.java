@@ -17,11 +17,27 @@ import java.util.Objects;
  * @param cost the energy it costs, where it has one
  * @param ticks how long it was chosen to last, for actions whose length is
  *     decided when they start, such as a sleep; zero otherwise
+ * @param fromOwnHands whether it uses what the agent carries rather than what
+ *     is in the world: a drink out of the pack, a taste off the ground
  */
 public record SavedAction(
-        String kind, ResourceType resource, Integer x, Integer y, double amount, double cost, int ticks) {
+        String kind,
+        ResourceType resource,
+        Integer x,
+        Integer y,
+        double amount,
+        double cost,
+        int ticks,
+        boolean fromOwnHands) {
 
     public SavedAction {
         Objects.requireNonNull(kind, "kind");
+    }
+
+    /** The common case: an action that deals with the world in the usual way. */
+    public SavedAction(
+            String kind, ResourceType resource, Integer x, Integer y,
+            double amount, double cost, int ticks) {
+        this(kind, resource, x, y, amount, cost, ticks, false);
     }
 }

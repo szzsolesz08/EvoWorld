@@ -142,6 +142,20 @@ public record ScenarioResult(Scenario scenario, long ticks, List<SeedResult> see
                 : seeds.stream().mapToInt(SeedResult::crafts).average().orElse(0.0);
     }
 
+    /** Fires started per run, averaged over the seeds. */
+    public double firesPerRun() {
+        return seeds.isEmpty()
+                ? 0.0
+                : seeds.stream().mapToInt(SeedResult::firesLit).average().orElse(0.0);
+    }
+
+    /** Times wood went on a fire per run, averaged over the seeds. */
+    public double feedsPerRun() {
+        return seeds.isEmpty()
+                ? 0.0
+                : seeds.stream().mapToInt(SeedResult::firesFed).average().orElse(0.0);
+    }
+
     private double perDay(double total) {
         double days = seeds.stream().mapToDouble(SeedResult::days).sum();
         return days <= 0.0 ? 0.0 : total / days;

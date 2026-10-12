@@ -251,8 +251,9 @@ class MotivationSystemTest {
         void everyGoalIsWeighed() {
             Motivation motivation = assess(new Needs(40, 40, 40, 60));
 
-            assertEquals(6, motivation.goals().size());
-            assertEquals(6, motivation.wanted().size());
+            assertEquals(7, motivation.goals().size());
+            assertEquals(6, motivation.wanted().size(),
+                    "all but keeping warm, which a mild afternoon does not ask for");
             assertTrue(motivation.goals().contains(motivation.dominant()));
         }
 
@@ -261,7 +262,7 @@ class MotivationSystemTest {
         void unwantedGoalsAreStillReported() {
             Motivation motivation = assess(Needs.healthy());
 
-            assertEquals(6, motivation.goals().size());
+            assertEquals(7, motivation.goals().size());
             assertEquals(2, motivation.wanted().size(),
                     "a healthy agent wants to look around, and to have water with it");
             assertFalse(motivation.forGoal(SatisfyHungerGoal.NAME).orElseThrow().isWanted());

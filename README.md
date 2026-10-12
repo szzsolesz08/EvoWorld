@@ -58,12 +58,12 @@ and the full pipeline from perception to learning, running unattended and reprod
 
 | Area | What exists |
 | --- | --- |
-| World | an endless seeded world in 64×64 chunks, built as it is walked into and stable ever after; country that varies from berry field to bare slope; berries, water, wood and stone that regrow at their own rates (stone never does). A walled world of any size is still available |
+| World | an endless seeded world in 64×64 chunks, built as it is walked into and stable ever after; country that varies from berry field to bare slope; berries, water, wood and stone that regrow at their own rates (stone never does); a day and a night with a spring temperature that peaks mid-afternoon. A walled world of any size is still available |
 | Time | discrete ticks of configurable simulated length (default 10 minutes); days and hours in all output |
 | Body | hunger, thirst, energy and health at realistic hourly rates; energy spent awake and restored asleep; unmet needs that do damage; healing when looked after, fastest asleep |
-| Actions | move, gather, eat, drink, rest, sleep, craft, discard; explicit preconditions, structured outcomes, multi-tick work |
-| Perception | a twelve-step field of view, about two hours' walk; nothing beyond it is known except by memory |
-| Goals | six wants (thirst, hunger, energy, health, curiosity, provisioning) scored from the agent's state, never from a rule |
+| Actions | move, gather, eat, drink, rest, sleep, craft, tend a fire, discard; explicit preconditions, structured outcomes, multi-tick work |
+| Perception | a field of view of twelve steps by day and four in the dark; nothing beyond it is known except by memory |
+| Goals | seven wants (thirst, hunger, energy, health, curiosity, provisioning, warmth) scored from the agent's state, never from a rule |
 | Decisions | propose, evaluate, select: six-factor utility, no if/else behaviour anywhere |
 | Memory | six kinds of memory with decaying confidence, bounded, recalled by relevance |
 | Knowledge | general beliefs learned from outcomes, distinct from memory; the agent starts ignorant |
@@ -172,7 +172,8 @@ Five goals each score themselves from the agent's state. A goal says **what**, n
 | recover energy | `(1 − energy / 100)²` |
 | recover health | `(1 − health / 100)²` |
 | explore | `0.6 × energy × unexplored fraction × (1 − most pressing need²)` |
-| stay provisioned | `0.3 × (1 − water carried / a day's worth) × (1 − most pressing need²)` |
+| stay provisioned | `0.3 × (1 − supplies carried / a day's worth) × (1 − most pressing need²)` |
+| keep warm | `(rest the cold would cost) × (1 − fire in hand) × (1 − most pressing need²)` |
 
 Hunger and thirst are an **appetite** and an **urgency** at once. The appetite comes
 early and levels off: a few hours after a meal he is peckish and eats if food is at hand.
@@ -183,6 +184,32 @@ Curiosity is what is left once survival has had its say, so a comfortable agent 
 and a dying one does not. Injury does *not* quiet curiosity. Exploring is how a newborn
 finds food, and when injury was counted against curiosity, three wounded newborns in
 twenty starved.
+
+### Day, night and fire
+
+The world has hours. `Sky` gives the light and the temperature from the time of day and
+nothing else — no state, nothing saved, the same on every run of a seed — so weather and
+seasons can later bend those two numbers without anything else changing.
+
+- **The shape is the real one.** Light is full between six and seven with twilight either
+  side. Warmth runs between the coldest hour, five in the morning at 5°C, and the warmest,
+  three in the afternoon at 16°C: the ground goes on cooling after midnight and on warming
+  after noon, which is why the small hours are the ones worth a fire for.
+- **Cold does two things, because the body has two currencies.** Shivering is work, so it
+  adds to what a tick costs; sleeping cold is poor recovery, so it scales what a tick gives
+  back — through the same comfort a bed was always going to use. Darkness enters here too,
+  and only helps: a body rests better in the dark.
+- **Night is genuinely darker.** Sight falls from twelve steps to four. Nothing says "stop
+  travelling at night"; there is simply less to find out there.
+- **A fire is the first thing an agent puts into the world.** Three steps of warmth, twelve
+  degrees at the centre, half a unit of wood an hour, burning on whether or not anyone is
+  watching. It is wanted for what the night would otherwise cost, discounted by the fire
+  already burning — judged by the fire that is warming him, not the tile he stands on.
+
+Left alone, Atlas keeps a few sticks on him, lights a fire on most nights, sleeps beside
+it and wakes rested. A spring night costs him about an hour of extra sleep when he has no
+fire, which is the clearest measure of what a fire is for. It is not dangerous: twenty
+seeds of twenty days across six scenarios all survive.
 
 ### Carrying, containers and making things
 

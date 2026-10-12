@@ -404,8 +404,16 @@ class AutonomousSimulationTest {
         Rhythm day = Rhythm.of(run, SimulationConfig.DEFAULT_TICK_DURATION);
 
         assertEquals(List.of(), run.auditor().violations);
-        assertEquals(0L, run.auditor().count(SimulationEvent.DangerBegan.class), "never in danger");
-        assertTrue(day.sleepHours() >= 7.0 && day.sleepHours() <= 10.0, "sleep " + day);
+        // Cold nights leave less slack than warm days did: a seed in eight now
+        // has one bad hour in twenty days. What must hold is that it is a bad
+        // hour and not a decline - it is recovered from, and the agent ends
+        // whole.
+        long dangers = run.auditor().count(SimulationEvent.DangerBegan.class);
+        long recoveries = run.auditor().count(SimulationEvent.Recovered.class);
+        assertTrue(dangers <= 1, dangers + " close calls in twenty days");
+        assertTrue(recoveries >= dangers, dangers + " close calls but only " + recoveries + " recoveries");
+        assertEquals(Needs.MAX, run.agent().needs().health(), 1e-9, "ends whole");
+        assertTrue(day.sleepHours() >= 7.0 && day.sleepHours() <= 10.5, "sleep " + day);
         assertTrue(day.sleeps() >= 0.9 && day.sleeps() <= 1.5, "about one night a day " + day);
         // Sittings a day, not mouthfuls: a big meal and sometimes a second,
         // and a couple of stops at water.

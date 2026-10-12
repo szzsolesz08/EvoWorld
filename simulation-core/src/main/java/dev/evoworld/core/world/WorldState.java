@@ -21,11 +21,27 @@ public record WorldState(
         SimulationTime time,
         WorldBounds bounds,
         List<AgentSnapshot> agents,
-        List<ResourceSnapshot> resources) {
+        List<ResourceSnapshot> resources,
+        List<FireSnapshot> fires) {
 
     public WorldState {
         agents = List.copyOf(agents);
         resources = List.copyOf(resources);
+        fires = List.copyOf(fires);
+    }
+
+    /** The same without any fires, for the many places that do not have them. */
+    public WorldState(
+            SimulationTime time,
+            WorldBounds bounds,
+            List<AgentSnapshot> agents,
+            List<ResourceSnapshot> resources) {
+        this(time, bounds, agents, resources, List.of());
+    }
+
+    /** What is burning at a place, if anything. */
+    public java.util.Optional<FireSnapshot> fireAt(Location where) {
+        return fires.stream().filter(fire -> fire.location().equals(where)).findFirst();
     }
 
     /** Convenience for the common case of only wanting the tick number. */

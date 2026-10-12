@@ -43,7 +43,8 @@ public final class MotivationSystem {
                 new RecoverEnergyGoal(),
                 new RecoverHealthGoal(),
                 new ExploreGoal(),
-                new StayProvisionedGoal()));
+                new StayProvisionedGoal(),
+                new KeepWarmGoal()));
     }
 
     public List<Goal> goals() {

@@ -1,6 +1,7 @@
 package dev.evoworld.core.goal;
 
 import dev.evoworld.core.perception.Perception;
+import dev.evoworld.core.world.Fire;
 import dev.evoworld.core.resource.ResourceType;
 import java.util.Locale;
 
@@ -41,6 +42,17 @@ public final class StayProvisionedGoal extends Goal {
 
     /** What the agent likes to have with it. */
     public static final ResourceType PROVISION = ResourceType.WATER;
+
+    /**
+     * And a little firewood, which is the other thing a night asks for.
+     *
+     * <p>Added when fire arrived. Wood fetched only once the cold had already
+     * bitten was wood fetched in the dark, a handful at a time, and all of it
+     * went straight on the fire - so nothing was ever left to make a flask
+     * out of. Keeping a night's worth about you is what a person does, and it
+     * is the same want as carrying water: having what tonight will need.
+     */
+    public static final double FIREWOOD = KeepWarmGoal.A_NIGHT * Fire.WOOD_PER_HOUR;
 
     /**
      * How much of it counts as being provisioned: about a day's drinking.
@@ -92,8 +104,29 @@ public final class StayProvisionedGoal extends Goal {
      * without anybody telling it that a flask is a good idea.
      */
     public static double shortfall(Perception perception) {
-        double carried = perception.inventory().quantityOf(PROVISION);
-        return Math.max(0.0, 1.0 - Math.min(carried, ENOUGH) / ENOUGH);
+        return Math.max(
+                shortfallOf(perception, PROVISION, ENOUGH),
+                WOOD_MATTERS_LESS * firewoodShortfall(perception));
+    }
+
+    /**
+     * How much less an empty woodpile weighs than an empty flask.
+     *
+     * <p>A night without a fire is uncomfortable; a day without water is
+     * dangerous. Counted equally, an agent in hard country - where wood is
+     * thin - spent its days hunting for firewood it could not find, and one
+     * of them died of thirst doing it.
+     */
+    private static final double WOOD_MATTERS_LESS = 0.6;
+
+    /** How far short of a night's firewood the agent is. */
+    public static double firewoodShortfall(Perception perception) {
+        return shortfallOf(perception, ResourceType.WOOD, FIREWOOD);
+    }
+
+    private static double shortfallOf(Perception perception, ResourceType type, double enough) {
+        double carried = perception.inventory().quantityOf(type);
+        return Math.max(0.0, 1.0 - Math.min(carried, enough) / enough);
     }
 
     @Override

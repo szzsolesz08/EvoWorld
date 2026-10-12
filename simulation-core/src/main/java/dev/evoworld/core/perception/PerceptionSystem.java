@@ -10,6 +10,7 @@ import dev.evoworld.core.memory.RecallQuery;
 import dev.evoworld.core.memory.Recollection;
 import dev.evoworld.core.resource.ResourceType;
 import dev.evoworld.core.world.Location;
+import dev.evoworld.core.world.Sky;
 import dev.evoworld.core.world.World;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -47,6 +48,9 @@ public final class PerceptionSystem {
      */
     public static final int DEFAULT_RADIUS = 12;
 
+    /** How much of its daylight sight an agent keeps in the dark. */
+    public static final double BY_NIGHT = 0.35;
+
     /** How many unknown corners an agent weighs at once. */
     private static final int FRONTIER_SIZE = 4;
 
@@ -64,6 +68,19 @@ public final class PerceptionSystem {
     }
 
     /**
+     * How far an agent can see at this hour.
+     *
+     * <p>A fraction of its daylight reach once the sun is down. Nothing tells
+     * an agent to stop travelling at night: there is simply much less to be
+     * seen out there, so going to look is worth less than it is by day, and
+     * the evaluator does the rest.
+     */
+    public int sightIn(Sky sky) {
+        double share = BY_NIGHT + (1.0 - BY_NIGHT) * sky.daylight();
+        return Math.max(0, (int) Math.round(radius * share));
+    }
+
+    /**
      * Everything {@code agent} can tell about {@code world} right now.
      *
      * <p>Results come back nearest first, ties broken by position, so a
@@ -75,8 +92,10 @@ public final class PerceptionSystem {
         Objects.requireNonNull(time, "time");
 
         Location here = agent.location();
+        Sky sky = Sky.at(time);
+        int seeing = sightIn(sky);
 
-        List<PerceivedResource> resources = world.resourcesNear(here, radius).stream()
+        List<PerceivedResource> resources = world.resourcesNear(here, seeing).stream()
                 .map(node -> PerceivedResource.seenFrom(here, node.snapshot()))
                 .sorted(nearestFirst(
                         PerceivedResource::stepsAway, PerceivedResource::location))
@@ -84,7 +103,7 @@ public final class PerceptionSystem {
 
         List<PerceivedAgent> others = world.agents().stream()
                 .filter(other -> !other.id().equals(agent.id()))
-                .filter(other -> isWithinRange(here, other.location()))
+                .filter(other -> here.manhattanDistanceTo(other.location()) <= seeing)
                 .map(other -> PerceivedAgent.seenFrom(here, other.snapshot()))
                 .sorted(nearestFirst(PerceivedAgent::stepsAway, PerceivedAgent::location))
                 .toList();
@@ -108,7 +127,10 @@ public final class PerceptionSystem {
                 others,
                 remembered,
                 agent.knowledge(),
-                surveyOf(agent.exploration(), here, time));
+                surveyOf(agent.exploration(), here, time),
+                sky,
+                sky.temperature() + world.warmthAt(here),
+                world.warmestFireNear(here));
     }
 
     /**

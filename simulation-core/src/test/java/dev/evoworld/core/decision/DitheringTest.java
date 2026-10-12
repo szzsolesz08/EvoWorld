@@ -58,8 +58,10 @@ class DitheringTest {
     /** Hungry enough that curiosity about a world it has never seen stays quiet. */
     private static final double HUNGRY = 85.0;
 
+    /** Ticks through the middle of the day, where an agent can see properly. */
     private static SimulationTime at(long tick) {
-        return new SimulationTime(tick, Duration.ofMinutes(10).multipliedBy(tick));
+        return new SimulationTime(
+                tick, Duration.ofHours(12).plus(Duration.ofMinutes(10).multipliedBy(tick)));
     }
 
     /** Hungry, sure bushes are reliable, but has eaten berries only twice. */

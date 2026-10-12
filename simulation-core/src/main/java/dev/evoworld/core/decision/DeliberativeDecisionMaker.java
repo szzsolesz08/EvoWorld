@@ -19,6 +19,7 @@ import dev.evoworld.core.decision.proposal.InvestigateProposer;
 import dev.evoworld.core.decision.proposal.RestProposer;
 import dev.evoworld.core.decision.proposal.SleepProposer;
 import dev.evoworld.core.decision.proposal.StockUpProposer;
+import dev.evoworld.core.decision.proposal.TendFireProposer;
 import dev.evoworld.core.goal.Motivation;
 import dev.evoworld.core.perception.Perception;
 import dev.evoworld.core.random.SimulationRandom;
@@ -84,6 +85,8 @@ public final class DeliberativeDecisionMaker implements DecisionMaker {
                                 actions.moveEnergyCost(), steps, actions.gatherTicks(tick)),
                         new InvestigateProposer(actions.eatPortion(), actions.moveEnergyCost(), steps),
                         new CraftProposer(tick),
+                        new TendFireProposer(
+                                actions.gatherEnergyCost(), actions.gatherTicks(tick)),
                         new FetchMaterialsProposer(
                                 actions.gatherAmount(), actions.gatherEnergyCost(),
                                 actions.gatherTicks(tick), actions.moveEnergyCost(), steps),

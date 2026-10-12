@@ -10,6 +10,7 @@ import dev.evoworld.core.action.EatAction;
 import dev.evoworld.core.action.GatherAction;
 import dev.evoworld.core.action.MoveAction;
 import dev.evoworld.core.action.RestAction;
+import dev.evoworld.core.action.TendFireAction;
 import dev.evoworld.core.action.SleepAction;
 import dev.evoworld.core.agent.ActivityLevel;
 import dev.evoworld.core.agent.Agent;
@@ -382,9 +383,14 @@ public final class SaveFormat {
                     GatherAction.NAME, gather.target(), null, null, gather.amount(), gather.energyCost(),
                     gather.durationTicks());
             case EatAction eat -> new SavedAction(
-                    EatAction.NAME, eat.food(), null, null, eat.portion(), 0.0, 0);
+                    EatAction.NAME, eat.food(), null, null, eat.portion(), 0.0, 0,
+                    eat.isFromGround());
             case DrinkAction drink -> new SavedAction(
-                    DrinkAction.NAME, drink.source(), null, null, drink.gulp(), 0.0, 0);
+                    DrinkAction.NAME, drink.source(), null, null, drink.gulp(), 0.0, 0,
+                    drink.isFromPack());
+            case TendFireAction fire -> new SavedAction(
+                    TendFireAction.NAME, ResourceType.WOOD, null, null, fire.wood(),
+                    fire.energyCost(), fire.durationTicks());
             case DiscardAction discard -> new SavedAction(
                     DiscardAction.NAME, discard.what(), null, null, discard.amount(), 0.0, 0);
             default -> throw new IllegalArgumentException(
@@ -401,8 +407,12 @@ public final class SaveFormat {
             case SleepAction.NAME -> new SleepAction(saved.ticks(), saved.amount());
             case GatherAction.NAME -> new GatherAction(
                     saved.resource(), saved.amount(), saved.cost(), saved.ticks());
-            case EatAction.NAME -> new EatAction(saved.resource(), saved.amount());
-            case DrinkAction.NAME -> new DrinkAction(saved.resource(), saved.amount());
+            case EatAction.NAME -> new EatAction(
+                    saved.resource(), saved.amount(), saved.fromOwnHands());
+            case DrinkAction.NAME -> new DrinkAction(
+                    saved.resource(), saved.amount(), saved.fromOwnHands());
+            case TendFireAction.NAME -> new TendFireAction(
+                    saved.amount(), saved.cost(), saved.ticks());
             case DiscardAction.NAME -> new DiscardAction(saved.resource(), saved.amount());
             default -> throw new IllegalArgumentException("unknown action in save: " + saved.kind());
         };

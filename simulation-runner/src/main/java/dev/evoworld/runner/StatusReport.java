@@ -15,6 +15,7 @@ import dev.evoworld.core.skill.Skills;
 import dev.evoworld.core.status.AgentStatus;
 import dev.evoworld.core.world.AgentSnapshot;
 import dev.evoworld.core.world.Location;
+import dev.evoworld.core.world.Sky;
 import dev.evoworld.core.world.WorldState;
 import java.time.Duration;
 import java.util.ArrayList;
@@ -111,6 +112,14 @@ public final class StatusReport implements SimulationObserver {
                 age(tickDuration.multipliedBy(body.ticksAlive())),
                 needs.health()));
         row(lines, "location", body.location().toString());
+        Sky sky = Sky.at(status.time());
+        row(lines, "outside", String.format(
+                Locale.ROOT,
+                "%02d:%02d, %.1f degrees, %s",
+                (int) Sky.hourOf(status.time().elapsed()),
+                (int) (Sky.hourOf(status.time().elapsed()) % 1 * 60),
+                sky.temperature(),
+                sky.isNight() ? "dark" : String.format(Locale.ROOT, "%.0f%% light", sky.daylight() * 100)));
         row(lines, "needs", String.format(
                 Locale.ROOT,
                 "hunger %.1f, thirst %.1f, energy %.1f",

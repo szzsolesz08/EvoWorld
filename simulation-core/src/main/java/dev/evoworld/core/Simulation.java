@@ -6,6 +6,7 @@ import dev.evoworld.core.agent.ActivityLevel;
 import dev.evoworld.core.agent.Agent;
 import dev.evoworld.core.agent.AgentId;
 import dev.evoworld.core.agent.Exertion;
+import dev.evoworld.core.agent.Exposure;
 import dev.evoworld.core.agent.MetabolismRates;
 import dev.evoworld.core.agent.Needs;
 import dev.evoworld.core.decision.Decision;
@@ -33,7 +34,10 @@ import dev.evoworld.core.save.SavedSimulation;
 import dev.evoworld.core.skill.SkillLevel;
 import dev.evoworld.core.status.AgentStatus;
 import dev.evoworld.core.skill.Skills;
+import dev.evoworld.core.save.SavedFire;
+import dev.evoworld.core.world.Fire;
 import dev.evoworld.core.world.Location;
+import dev.evoworld.core.world.Sky;
 import dev.evoworld.core.world.World;
 import dev.evoworld.core.world.WorldGenerator;
 import dev.evoworld.core.world.WorldState;
@@ -315,6 +319,10 @@ public final class Simulation {
                 announced,
                 world.generatesItself() ? List.of() : world.resources().stream().map(SaveFormat::save).toList(),
                 world.generatesItself() ? SaveFormat.saveChunks(world, config) : List.of(),
+                world.fires().stream()
+                        .map(fire -> new SavedFire(
+                                fire.location().x(), fire.location().y(), fire.fuel()))
+                        .toList(),
                 agents);
     }
 
@@ -345,6 +353,8 @@ public final class Simulation {
         } else {
             saved.resources().forEach(resource -> world.addResource(SaveFormat.load(resource)));
         }
+        saved.fires().forEach(fire ->
+                world.restoreFire(new Fire(new Location(fire.x(), fire.y()), fire.fuel())));
         for (SavedAgent agent : saved.agents()) {
             world.addAgent(SaveFormat.load(agent, config.bounds()));
         }
@@ -388,6 +398,8 @@ public final class Simulation {
                 .toList();
         world.regenerateResources(
                 config.tickDuration(), whereEveryoneIs, config.perceptionRadius(), now.tick());
+        // Fires burn down whether or not anyone is warming their hands at them.
+        world.burnFires(config.tickDuration());
 
         for (Agent agent : world.agents()) {
             if (!agent.isAlive()) {
@@ -420,7 +432,15 @@ public final class Simulation {
      */
     private void liveThroughTheTick(Agent agent, SimulationTime now) {
         Needs before = agent.needs();
-        Exertion effort = lastActivity.getOrDefault(agent.id(), Exertion.of(ActivityLevel.RESTING));
+        // What the tick asked of the body: the work the agent chose, in the
+        // conditions it was doing it in. A cold night costs whatever the agent
+        // was up to, and a fire is worth having whatever it was up to.
+        Sky sky = Sky.at(now);
+        Exposure conditions =
+                Exposure.of(sky.temperature() + world.warmthAt(agent.location()), sky.daylight());
+        Exertion effort = lastActivity
+                .getOrDefault(agent.id(), Exertion.of(ActivityLevel.RESTING))
+                .in(conditions);
         agent.live(bodyPerTick, effort);
         double healthLost = before.health() - agent.needs().health();
         MemoryRecorder.rememberHarm(

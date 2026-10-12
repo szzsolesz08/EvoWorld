@@ -47,7 +47,6 @@ public final class SleepProposer implements ActionProposer {
 
     private final MetabolismRates metabolism;
     private final int longestSleep;
-    private final double comfort;
 
     /**
      * @param metabolism one tick's worth of the body's rates
@@ -59,8 +58,6 @@ public final class SleepProposer implements ActionProposer {
             throw new IllegalArgumentException("a sleep lasts at least one tick, was " + longestSleep);
         }
         this.longestSleep = longestSleep;
-        // Bare ground, until there is something better to sleep on.
-        this.comfort = 1.0;
     }
 
     @Override
@@ -71,6 +68,11 @@ public final class SleepProposer implements ActionProposer {
         if (!tired && !bedRest) {
             return List.of();
         }
+        // How good a night this would be: warm or cold, dark or broad daylight,
+        // beside a fire or not. A poor night restores less per hour, so it is
+        // worth less and takes longer - which is why an agent with a choice
+        // sleeps in the dark, and by a fire when it has one.
+        double comfort = perception.conditions().comfort();
         double gainPerTick = metabolism.energyChangeFor(ActivityLevel.SLEEPING) * comfort;
         int wanted = tired ? ticksToFull(needs.energy(), gainPerTick) : longestSleep;
         int ticks = Math.min(wanted, ticksBeforeHarm(needs));

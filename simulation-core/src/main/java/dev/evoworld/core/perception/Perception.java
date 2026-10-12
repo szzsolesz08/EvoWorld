@@ -2,13 +2,16 @@ package dev.evoworld.core.perception;
 
 import dev.evoworld.core.SimulationTime;
 import dev.evoworld.core.agent.AgentId;
+import dev.evoworld.core.agent.Exposure;
 import dev.evoworld.core.agent.Inventory;
 import dev.evoworld.core.agent.Needs;
 import dev.evoworld.core.item.Belongings;
 import dev.evoworld.core.knowledge.Knowledge;
 import dev.evoworld.core.resource.ResourceType;
 import dev.evoworld.core.world.AgentSnapshot;
+import dev.evoworld.core.world.Fire;
 import dev.evoworld.core.world.Location;
+import dev.evoworld.core.world.Sky;
 import dev.evoworld.core.world.WorldBounds;
 import java.util.ArrayList;
 import java.util.List;
@@ -49,7 +52,10 @@ public record Perception(
         List<PerceivedAgent> others,
         List<RememberedResource> remembered,
         Knowledge knowledge,
-        ExplorationView exploration) {
+        ExplorationView exploration,
+        Sky sky,
+        double temperature,
+        Optional<Fire> fire) {
 
     public Perception {
         Objects.requireNonNull(time, "time");
@@ -63,6 +69,8 @@ public record Perception(
         remembered = List.copyOf(remembered);
         Objects.requireNonNull(knowledge, "knowledge");
         Objects.requireNonNull(exploration, "exploration");
+        Objects.requireNonNull(sky, "sky");
+        Objects.requireNonNull(fire, "fire");
     }
 
     // --- the agent's own state --------------------------------------------
@@ -81,6 +89,49 @@ public record Perception(
 
     public Inventory inventory() {
         return self.inventory();
+    }
+
+    /**
+     * The same, on a mild afternoon with no fire about: the conditions a test
+     * means when it is not testing the conditions.
+     */
+    public Perception(
+            SimulationTime time,
+            AgentSnapshot self,
+            WorldBounds bounds,
+            int radius,
+            List<PerceivedResource> resources,
+            List<PerceivedAgent> others,
+            List<RememberedResource> remembered,
+            Knowledge knowledge,
+            ExplorationView exploration) {
+        this(time, self, bounds, radius, resources, others, remembered, knowledge, exploration,
+                Sky.atHour(MILD_HOUR), Sky.atHour(MILD_HOUR).temperature(), Optional.empty());
+    }
+
+    /**
+     * The hour a perception is built at when nobody says otherwise: the warmest
+     * of the day, so that conditions ask nothing of an agent in a test that is
+     * not about conditions.
+     */
+    private static final double MILD_HOUR = 15.0;
+
+    /**
+     * What the conditions are doing to the body: shivering, and how well it
+     * would rest here. Includes whatever a fire nearby is contributing.
+     */
+    public Exposure conditions() {
+        return Exposure.of(temperature, sky.daylight());
+    }
+
+    /** Whether the agent is standing at the fire, which is where it can be fed. */
+    public boolean isAtTheFire() {
+        return fire.filter(burning -> burning.location().equals(location())).isPresent();
+    }
+
+    /** Whether it is dark enough that seeing is hard. */
+    public boolean isNight() {
+        return sky.isNight();
     }
 
     /** How much more of something the agent could carry, pack and containers together. */
